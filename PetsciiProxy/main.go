@@ -175,8 +175,6 @@ func main() {
 	fmt.Printf("Teletext PetsciiProxy Go server, serving on port %d\n", port)
 
 	address := fmt.Sprintf(":%d", port)
-	fmt.Printf("address %v\n", address)
-
 	err = http.ListenAndServe(address, mux)
 	if err != nil {
 		fmt.Println("Server error:", err)
@@ -191,7 +189,7 @@ func nosttHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	pageName := strings.TrimPrefix(id, "/")
-	printPageRequest(pageName)
+	printPageRequest(DirNOS, pageName)
 	nosttGetTeletexPage(pageName)
 
 	path := filepath.Join(DirNOS, pageName)
@@ -289,7 +287,7 @@ func nosttGetTeletexPage(pageNr string) {
 func ardtextHandler(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	pageName := strings.TrimPrefix(id, "/")
-	printPageRequest(pageName)
+	printPageRequest(DirARD, pageName)
 	ardtextGetTeletexPage(pageName)
 
 	path := filepath.Join(DirARD, pageName)
@@ -672,6 +670,7 @@ func sendErrorMsg(w http.ResponseWriter, code int, message string) {
 	w.Write([]byte(message))
 }
 
-func printPageRequest(s string) {
-	fmt.Println("Page request:", s)
+func printPageRequest(station string, page string) {
+	now := time.Now()
+	fmt.Printf("%v Station: %v Page request: %v\n", now.Format("2006-01-02 15:04:05"), station, page)
 }

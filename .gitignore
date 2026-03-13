@@ -11,7 +11,13 @@
 
 !/PetsciiProxy/
 /PetsciiProxy/*
-!/PetsciiProxy/*.py
+!/PetsciiProxy/go.mod
+!/PetsciiProxy/go.sum
+!/PetsciiProxy/main.go
+!/PetsciiProxy/Makefile
+!/PetsciiProxy/dist/
+!/PetsciiProxy/dist/petsciiproxy-apple-silicon
+!/PetsciiProxy/dist/petsciiproxy-windows.exe
 
 !/Teletext64U/
 !/Teletext64U/target/

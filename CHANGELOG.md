@@ -1,5 +1,21 @@
 # **Teletext64U** changelog
 
+## [1.1.0] - 2026-03-10
+
+### Added
+- German ARD-TEXT aka *'Der Teletext im Ersten'*
+- Press 'S' to switch (alternate) stations and show start page 100
+- PetsciiProxy is rewritten in Go, which creates stand alone target executables for Windows, Mac and Linux. 
+
+### Removed
+- PetsciiProxy written in Python. Lot's of people had problems getting it up and running or having network security issues, or simply didn't want to give Python full network access (understandable). For me personally -being completely new to Go- I really like the Go language and it's features.
+
+### Remarks ARD-TEXT
+- It works almost 100%. There are some minor spacing situations to address. For example: At page 403 you will see famous people with their birth date's in yellow and below in white text a little biography. This block of text should be idented one space to the right.
+- I had to fix the 3 rows on the top on each page (except page 100). The html pulled off some weird tricks that had to be corrected when parsing the data. This has to do with how teletext works. When you want to change color for example, the control character needed to do this takes 1 position on screen and won't be visible. A control character will be replaced by a space on screen.
+- Fast Text Links (those 4 colored words on the bottom row): ARD-TEXT does not provide these (not online, nor on TV), so I made up then myself. They are always the same for every page. I could make this smarter in a future release to make them dynamic.
+
+
 ## [1.0.2] - 2026-03-07
 
 ### Added
