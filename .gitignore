@@ -16,7 +16,9 @@
 !/PetsciiProxy/main.go
 !/PetsciiProxy/Makefile
 !/PetsciiProxy/dist/
-!/PetsciiProxy/dist/petsciiproxy-apple-silicon
+!/PetsciiProxy/dist/petsciiproxy-linux-386
+!/PetsciiProxy/dist/petsciiproxy-mac-silicon
+!/PetsciiProxy/dist/petsciiproxy-mac-intel
 !/PetsciiProxy/dist/petsciiproxy-windows.exe
 
 !/Teletext64U/

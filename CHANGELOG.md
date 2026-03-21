@@ -1,5 +1,21 @@
 # **Teletext64U** changelog
 
+## [1.2.0] - 2026-03-21
+
+### Added
+- CEEFAX
+- TEEFAX
+- Double height character support
+
+* Many thanks to Giancarlo for the suggestions below:
+- Config utility: your favorite start up station and page can now be configured. 
+- PetsciiProxy executables added for Linux 386 32 bit and Intel Mac
+
+### Note
+- Both CEEFAX and TEEFAX use the TTI Page file format. If you know any other teletext source that makes use of TTI it would be fairly easy to support it. So let me know, and I'll look into it.
+- TEEFAX showed me I still have some work to do to achieve complete teletext compliancy. I have yet to implement conceal, flashing text, add support country specific characters and optimize and fix a few quirks. Stay tuned for further releases.
+
+
 ## [1.1.0] - 2026-03-10
 
 ### Added
