@@ -16,16 +16,18 @@ Functionality:
 Supported teletext services:
 - NOS Teletekst / NOS-TT (Dutch teletext)
 - ARD-TEXT (German: 'Der Teletext im Ersten')
+- NMS CEEFAX (British teletext, closed by the BBC in 2012 and recreated by Nathan Dane)
+- TEEFAX (British teletext, a community based service with a huge collection of fine teletext art, historical pages and other great stuff)
 
 Next up:
-- BBC CEEFAX (British teletext, not available anymore via TV, but very nicely recreated online)
 - other services which can be parsed
 
 The NOS-TT file format is being used for the other teletext services:
-  - Is set up fairly efficient: mostly around 1073 bytes; a little bit bigger if a page has sub pages.
-  - The file format is a text block with (sub)page and fast text links followed by a <pre>..</pre> block
-  - which contains 1000 bytes of raw teletext data (control codes, text and mosiac/graphic characters)
-  - It looks like this:
+Is set up fairly efficient: mostly around 1073 bytes; a little bit bigger if a page has sub pages.
+The file format is a text block with (sub)page and fastext links followed by a <pre>..</pre> block
+which contains 1000 bytes of raw teletext data (control codes, text and mosiac/graphic characters)
+
+It looks like this:
     pn=p_503-1
     pn=n_521-1
     pn=ps520-1
@@ -43,6 +45,7 @@ Why transform to the NOS-TT format? Basically to keep things simple for the Tele
 - It only needs to have one routine to decode teletext data.
 - Adding a new teletext service within Teletext64U is just adding an item to a table.
 */
+
 package main
 
 import (
@@ -930,6 +933,9 @@ func formatTime(timestamp int64, useTimestamp bool) string {
 	)
 }
 
+// TEEFAX works a little different compared to CEEFAX. We can't just request pages with a fixed URL. Every
+// page can have a unique URL. These are listed in the URL below. So when we want a certain page, we first
+// lookup what the URL is in the directory list.
 const baseURL = "http://teastop.plus.com/svn/teletext/"
 
 var directoryData []byte
