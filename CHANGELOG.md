@@ -1,5 +1,10 @@
 # **Teletext64U** changelog
 
+## [1.2.1] - 2026-03-22
+
+### PetsciiProxy minor update
+- The headers on NOS-TT pages 703 and up are now displayed in double height again, like in the old days.
+
 ## [1.2.0] - 2026-03-21
 
 ### Added
