@@ -4,6 +4,7 @@
 !.gitignore
 !README.md
 !CHANGELOG.md
+!MANUAL.md
 
 # Allowed to publish
 !/docs/

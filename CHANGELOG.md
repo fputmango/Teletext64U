@@ -1,9 +1,19 @@
 # **Teletext64U** changelog
 
+## [1.2.2] - 2026-03-23
+
+### Added
+- *Conceal* support added in Teletext64U. When a page has concealed (hidden) text it won't be shown until you press the 'C' key. It acts like a toggle switch. And how to know if a page contains concealed text? Normally you won't, but I created a special green graphic that will pop up in the top header row after the page number. Only TEEFAX has pages that make use of the conceal feature. Maybe CEEFAX has them too, but so far I couldn't find any.
+
+### Fixed
+- PetsciiProxy: CEEFAX page 101 suddenly had a OL,26,.. line in the TTI file resulting in a panic; all Ol's greater than 24 are ignored now.
+
+
 ## [1.2.1] - 2026-03-22
 
 ### PetsciiProxy minor update
 - The headers on NOS-TT pages 703 and up are now displayed in double height again, like in the old days.
+
 
 ## [1.2.0] - 2026-03-21
 

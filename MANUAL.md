@@ -27,6 +27,7 @@ With this program you configure:
 |B | Bold font |
 |T | Thin font |
 |S | Switch station/telext service |
+|C | Shows/hides concealed text |
 |F1 | Fastext red |
 |F3 | Fastext green |
 |F5 | Fastext yellow |

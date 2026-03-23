@@ -860,6 +860,9 @@ func parseTTIRows(r io.Reader, pageStr string, subpageStr string, isCEEFAX bool)
 		if subpageFound && bytes.HasPrefix(parts[0], []byte("OL")) {
 			numberStr := string(parts[1])
 			lineNumber, _ := strconv.Atoi(numberStr)
+			if lineNumber > 24 {
+				break
+			}
 
 			col := 0
 			for _, c := range parts[2] {
