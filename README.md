@@ -1,5 +1,7 @@
 # Teletext 64 Ultimate
 
+[![Hypercommit](https://img.shields.io/badge/Hypercommit-DB2475)](https://hypercommit.com/teletext64u)
+
 Teletext program showing live pages from the internet for the Commodore 64 Ultimate and other Ultimate products that have networking capabilities.
 
 Currently supporting:
