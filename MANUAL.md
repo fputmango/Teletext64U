@@ -26,7 +26,8 @@ With this program you configure:
 |DN | Subpage down |
 |B | Bold font |
 |T | Thin font |
-|S | Switch station/telext service |
+|S | Switch station (carousel) |
+|M | Switch station (menu list) |
 |C | Shows/hides concealed text |
 |F1 | Fastext red |
 |F3 | Fastext green |

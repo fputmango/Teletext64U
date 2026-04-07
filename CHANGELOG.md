@@ -1,5 +1,13 @@
 # **Teletext64U** changelog
 
+## [1.3.1] - 2026-04-06
+
+### Added
+- Station list menu. Press 'M' to display, use cursor up/down and RETURN to select.
+- ó and î character support.
+- Improved character draw speed by 50%. Note: because the data is also being fetched from the server and processed while displaying the teletext page, the practical increase is around 10%. The improvement will be noticable on original 1 Mhz C64 machines with an Ultimate cartridge.
+
+
 ## [1.3.0] - 2026-03-28
 
 ### Added
