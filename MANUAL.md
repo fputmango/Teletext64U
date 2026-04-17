@@ -20,10 +20,12 @@ With this program you configure:
 | Key | Description |
 | :--- | :--- |
 |CLR HOME|Go to favorite start page |
-|+| Go to the next page; current page + 1|
-|-| Go to the previous page; current page - 1|
+|+| Go to current page + 1|
+|-| Go to current page - 1|
+|←| Go to previous teletext page (max. 20 steps back). Resets when changing stations.|
 |UP | Subpage up |
 |DN | Subpage down |
+|R | Refresh current teletext page |
 |B | Bold font |
 |T | Thin font |
 |S | Switch station (carousel) |
