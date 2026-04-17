@@ -8,6 +8,7 @@ Currently supporting:
 - CEEFAX (UK) - closed by the BBC in 2012 and recreated by Nathan Dane
 - TEEFAX (UK) - a community based service with a huge collection of fine teletext art, historical pages and other great stuff.
 - YLE Teksti-TV (Finland)
+- SVE Text (Sweden)
 
 My mission: add as many Teletext services as possible. So let me know if you have any wishes.
 
