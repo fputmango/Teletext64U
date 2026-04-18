@@ -4,14 +4,14 @@ Teletext program showing live pages from the internet for the Commodore 64 Ultim
 
 Currently supporting:
 
-| Service | Country |Description |
-| :--- | :--- | :--- |
-|NOS Teletekst |The Netherlands | |
-|ARD Text |Germany |*'Der Teletext im Ersten'* |
-|Ceefax |UK |Closed by the BBC in 2012 and recreated by Nathan Dane |
-|Teefax |UK |A community based service with a huge collection of fine teletext art, historical pages and other great stuff |
-|YLE Teksti-TV |Finland | |
-|SVT Text |Sweden | |
+| Service | Country |
+| :--- | :--- |
+|NOS Teletekst |The Netherlands |
+|ARD Text |Germany |
+|Ceefax |UK |
+|Teefax |UK |
+|YLE Teksti-TV |Finland |
+|SVT Text |Sweden |
 
 
 My mission: add as many Teletext services as possible. So let me know if you have any wishes.
