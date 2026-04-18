@@ -3,7 +3,7 @@
 ## [1.4.0] - 2026-04-17
 
 ### Added
-- SVE Text (Sweden)
+- SVT Text (Sweden)
 - The station selection list ('M' key) now wraps from the last item back to the first (or vice versa).
 - 'R' - Instant refresh of the current teletext page.
 - '←' - Go to previous teletext page (max. 20 steps back). Resets when changing stations.
@@ -11,8 +11,8 @@
 ### Notes on SVE Text
 - Some of the teletext pages seem to a real mess under the hood. Could also be my parsing skills. Manual intervention was nessecary on several pages to correct teletext control codes in code to be able to display them correctly. I do not know if this is due to the API, or the source the API is using. Also, the way the API handles mosaic characters is very strange, with referal to GIF images with a unclear numeric coding system and baked in colors. I tried to be complete, but could still could have missed something. The weather page (401) graphic is not accurate and needs some work.
 - Bottom row: currently shows fixed fastext links.
-- Also bottom row: A subpage indicator will be shown if needed for user convenience. For some reason SVE Text does not supply this most of the time. E.g. https://www.svt.se/text-tv/331 The official SVE Text on the web shows all the subpages at once. Maybe a subpage indicator is available on SVE Text on an actual TV.
-- The actual publishing date and time info from the teletext page is used! For some reason older pages are still being hosted. E.g. https://texttv.nu/221 ('Hem › Ekonomi › 221'). If a page is really old, the date with year (DD-MM-YYYY) is being shown in the header.
+- Also bottom row: A subpage indicator will be shown if needed for user convenience. For some reason SVE Text does not supply this most of the time. E.g. https://www.svt.se/text-tv/331 The official SVT Text on the web shows all the subpages at once. Maybe a subpage indicator is available on SVT Text on an actual TV.
+- The publishing date and time info from the teletext page is used. For some reason older pages are still being hosted. E.g. https://texttv.nu/221 ('Hem › Ekonomi › 221'). If a page is really old, the date with year (DD-MM-YYYY) is being shown in the header.
 
 
 
