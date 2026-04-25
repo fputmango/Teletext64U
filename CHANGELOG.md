@@ -1,5 +1,19 @@
 # **Teletext64U** changelog
 
+## [1.5.0] - 2026-04-25
+
+### Added
+- ZDFtext, ZDFinfo, ZDFneo & 3sat (all German language)
+- SVT Text: App-id now provided when fetching pages from texttv (?app=teletext64u) - thanks to Pär Thernström
+- +/- behaviour: if a teletext service provides info about the previous and next pages on the current page, the +/- keys will use this info to navigate.
+
+### Notes on the newly added teletext services
+- ZDF(text): German national public service television
+- ZDFinfo: TV station with a focus on documentaries, reports and portraits
+- ZDF_neo: TV station for a younger audience (25-49)
+- 3sat: provided by ARD, ZDF (both Germany), ORF (Austria) and SRG (Switserland). It is a free-to-air, commercial-free German-language public service television channel focusing on culture, science, and education.
+
+
 ## [1.4.0] - 2026-04-17
 
 ### Added

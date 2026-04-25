@@ -20,8 +20,8 @@ With this program you configure:
 | Key | Description |
 | :--- | :--- |
 |CLR HOME|Go to favorite start page |
-|+| Go to current page + 1|
-|-| Go to current page - 1|
+|+| Go to current page +1 / next page|
+|-| Go to current page -1 / previous page|
 |←| Go to previous teletext page (max. 20 steps back). Resets when changing stations.|
 |UP | Subpage up |
 |DN | Subpage down |
@@ -37,5 +37,5 @@ With this program you configure:
 |F7 | Fastext cyan |
 
 ## PetsciiProxy 
-This runs on your PC and acts as a bridge between the internet and your C64 Ultimate/Other Ultimate product running Teletext64U. The default listening port is 8080. You can change the port by starting PetsciiProxy with a command line parameter. Start the program with --help for all parameter options.
+This runs on your PC (or Mac/Linux/NAS/..) and acts as a bridge between the internet and your C64 Ultimate/Other Ultimate product running Teletext64U. The default listening port is 8080. You can change the port by starting PetsciiProxy with a command line parameter. Start the program with --help for all parameter options.
 

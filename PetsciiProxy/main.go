@@ -56,7 +56,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	_ "image/gif"
 	"io"
 	"net/http"
 	"os"
@@ -71,22 +70,30 @@ import (
 
 // Supported teletext services
 const (
-	DirNOS    = "NOS-TT"
-	DirARD    = "ARD-TEXT"
-	DirCEEFAX = "CEEFAX"
-	DirTEEFAX = "TEEFAX"
-	DirTEKSTI = "TEKSTI-TV"
-	DirSVT    = "SVT-TEXT"
+	DirNOS     = "NOS-TT"
+	DirARD     = "ARD-TEXT"
+	DirZDF     = "ZDF-TEXT"
+	DirZDFinfo = "ZDFINFO"
+	DirZDFneo  = "ZDFNEO"
+	Dir3sat    = "3SAT"
+	DirCEEFAX  = "CEEFAX"
+	DirTEEFAX  = "TEEFAX"
+	DirTEKSTI  = "TEKSTI-TV"
+	DirSVT     = "SVT-TEXT"
 )
 
 // Each service has its own handler
 var handlers = map[string]http.HandlerFunc{
-	DirNOS:    nosttHandler,
-	DirARD:    ardtextHandler,
-	DirCEEFAX: ceefaxHandler,
-	DirTEEFAX: teefaxHandler,
-	DirTEKSTI: tekstiHandler,
-	DirSVT:    svttextHandler,
+	DirNOS:     nosttHandler,
+	DirARD:     ardtextHandler,
+	DirZDF:     zdftextHandler,
+	DirZDFinfo: zdfinfoHandler,
+	DirZDFneo:  zdfneoHandler,
+	Dir3sat:    zdf3satHandler,
+	DirCEEFAX:  ceefaxHandler,
+	DirTEEFAX:  teefaxHandler,
+	DirTEKSTI:  tekstiHandler,
+	DirSVT:     svttextHandler,
 }
 
 // Teletext control codes (range 0x00..0x1F); Alpha is a regular character; a mosaic is a graphics character
@@ -126,6 +133,15 @@ const (
 	TCC_RELEASE_MOSAICS    = 0x1F
 )
 
+// General vars
+var prevPage int
+var nextPage int
+var numberOfSubpages int
+var prevSubpage int
+var nextSubpage int
+
+// ARD Text
+
 // These characters are used in ARD-TEXT html classes, e.g. class='fgy bgb' means yellow character on a black background
 var ardColorMap = map[string]byte{
 	"b ": 0, // black, note: I have added black twice with an explicit space and single quote to prevent
@@ -138,6 +154,8 @@ var ardColorMap = map[string]byte{
 	"c":  6, // cyan
 	"w":  7, // white
 }
+
+// END ARD Text
 
 // TEKSTI-TV: XML based
 
@@ -387,10 +405,10 @@ func nosttGetTeletexPage(pageNr string) {
 
 	finalBytes := []byte(modifiedContent)
 
-	// Funny hack. These pages used to have a double heigth row on top. At some point NOS-TT decided
-	// to make it normal height and the row below became black. The code restores double height!
+	// post-fix
+	// These pages used to have a double heigth row on top. At some point NOS-TT decided
+	// to make it normal height and the row below became black. This fix restores double height.
 	if (cleanNrInt > 702 && cleanNrInt < 733) || (cleanNrInt > 750 && cleanNrInt < 763) {
-		// fix 2nd row: find 1st 0x20 (space) and replace with double height control code
 		for x := 0; x < 39; x++ {
 			if finalBytes[startIndex+5+2*40+x] == 0x20 {
 				finalBytes[startIndex+5+2*40+x] = 0x0D
@@ -456,14 +474,13 @@ func ardtextGetTeletexPage(pageNr string) {
 	// aka: start page, sport, weather, stocks
 	var output []byte
 	output = append(output, []byte(fmt.Sprintf(
-		"pn=p_%s\npn=n_102-1\nftl=100-0\nftl=200-0\nftl=171-0\nftl=711-0\n<pre>",
-		pageNr))...)
+		"pn=p_\npn=n_\nftl=100-0\nftl=200-0\nftl=171-0\nftl=711-0\n<pre>"))...)
 
 	row0 := make([]byte, 40)
 	for i := range row0 {
 		row0[i] = 0x20
 	}
-	dt := getGermanDate()
+	dt := getArdDate()
 	start := 5
 	row0[start] = byte(TCC_ALPHA_GREEN)
 	stationPage := "ARD-TEXT  " + parts[0]
@@ -779,11 +796,606 @@ func stringToLatin1Bytes(s string) []byte {
 	return res
 }
 
-func getGermanDate() string {
+func getArdDate() string {
 	now := time.Now()
 	months := map[string]string{"Jan": "Jan", "Feb": "Feb", "Mar": "Mär", "Apr": "Apr", "May": "Mai", "Jun": "Jun", "Jul": "Jul", "Aug": "Aug", "Sep": "Sep", "Oct": "Okt", "Nov": "Nov", "Dec": "Dez"}
 	days := map[string]string{"Sun": "Son", "Mon": "Mon", "Tue": "Die", "Wed": "Mit", "Thu": "Don", "Fri": "Fre", "Sat": "Sam"}
 	return fmt.Sprintf("%s %02d %s  %s", days[now.Format("Mon")], now.Day(), months[now.Format("Jan")], now.Format("15:04:05"))
+}
+
+// --- ZDF-TEXT ---
+
+func zdftextHandler(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	pageName := strings.TrimPrefix(id, "/")
+	logPageRequest(DirZDF, pageName)
+	zdftextGetTeletexPage(pageName, "zdf", DirZDF)
+
+	path := filepath.Join(DirZDF, pageName)
+	if _, err := os.Stat(path); err == nil {
+		content, err := os.ReadFile(path)
+		if err != nil {
+			sendErrorMsg(w, 500, "Internal error reading file")
+			return
+		}
+
+		w.Header().Set("Content-Type", "text/plain; charset=ISO-8859-1")
+		w.WriteHeader(200)
+		w.Write(content)
+
+	} else {
+		sendErrorMsg(w, 404, "Teletext page "+pageName+" not found.")
+	}
+}
+
+func zdfinfoHandler(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	pageName := strings.TrimPrefix(id, "/")
+	logPageRequest(DirZDFinfo, pageName)
+	zdftextGetTeletexPage(pageName, "zdfinfo", DirZDFinfo)
+
+	path := filepath.Join(DirZDFinfo, pageName)
+	if _, err := os.Stat(path); err == nil {
+		content, err := os.ReadFile(path)
+		if err != nil {
+			sendErrorMsg(w, 500, "Internal error reading file")
+			return
+		}
+
+		w.Header().Set("Content-Type", "text/plain; charset=ISO-8859-1")
+		w.WriteHeader(200)
+		w.Write(content)
+
+	} else {
+		sendErrorMsg(w, 404, "Teletext page "+pageName+" not found.")
+	}
+}
+
+func zdfneoHandler(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	pageName := strings.TrimPrefix(id, "/")
+	logPageRequest(DirZDFneo, pageName)
+	zdftextGetTeletexPage(pageName, "zdfneo", DirZDFneo)
+
+	path := filepath.Join(DirZDFneo, pageName)
+	if _, err := os.Stat(path); err == nil {
+		content, err := os.ReadFile(path)
+		if err != nil {
+			sendErrorMsg(w, 500, "Internal error reading file")
+			return
+		}
+
+		w.Header().Set("Content-Type", "text/plain; charset=ISO-8859-1")
+		w.WriteHeader(200)
+		w.Write(content)
+
+	} else {
+		sendErrorMsg(w, 404, "Teletext page "+pageName+" not found.")
+	}
+}
+
+func zdf3satHandler(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	pageName := strings.TrimPrefix(id, "/")
+	logPageRequest(Dir3sat, pageName)
+	zdftextGetTeletexPage(pageName, "3sat", Dir3sat)
+
+	path := filepath.Join(Dir3sat, pageName)
+	if _, err := os.Stat(path); err == nil {
+		content, err := os.ReadFile(path)
+		if err != nil {
+			sendErrorMsg(w, 500, "Internal error reading file")
+			return
+		}
+
+		w.Header().Set("Content-Type", "text/plain; charset=ISO-8859-1")
+		w.WriteHeader(200)
+		w.Write(content)
+
+	} else {
+		sendErrorMsg(w, 404, "Teletext page "+pageName+" not found.")
+	}
+}
+
+func zdftextGetTeletexPage(pageNr string, zdfStation string, dirStation string) {
+	var url string
+	parts := strings.Split(pageNr, "-")
+	subPage, _ := strconv.Atoi(parts[1])
+
+	if subPage < 2 {
+		url = fmt.Sprintf("https://teletext.zdf.de/teletext/%s/seiten/klassisch/%s.html", zdfStation, parts[0])
+	} else {
+		subPage--
+		subStr := strconv.Itoa(subPage)
+		url = fmt.Sprintf("https://teletext.zdf.de/teletext/%s/seiten/klassisch/%s_%s.html", zdfStation, parts[0], subStr)
+	}
+
+	logFetchingPage(url)
+	resp, err := http.Get(url)
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		fmt.Println("HTTP Error: Could not retrieve page", pageNr, "Status:", resp.StatusCode)
+		return
+	}
+
+	numberOfSubpages = 0
+	prevPage = 0
+	nextPage = 0
+	rows := parseZDFRows(resp.Body, zdfStation, parts[0])
+
+	// optional directives for (sub)page navigation
+	pp := ""
+	np := ""
+	ps := ""
+	ns := ""
+	subPage, _ = strconv.Atoi(parts[1])
+	prevSubpage = subPage - 1
+	nextSubpage = subPage + 1
+	currentPage = parts[0]
+	if numberOfSubpages > 1 {
+		if prevSubpage > 0 {
+			ps = "pn=ps" + currentPage + "-" + strconv.Itoa(prevSubpage) + "\n"
+		}
+		if nextSubpage <= numberOfSubpages {
+			ns = "pn=ns" + currentPage + "-" + strconv.Itoa(nextSubpage) + "\n"
+		}
+	}
+	if prevPage > 0 {
+		pp = "pn=p_" + strconv.Itoa(prevPage) + "-1\n"
+	}
+	if nextPage > 0 {
+		np = "pn=n_" + strconv.Itoa(nextPage) + "-1\n"
+	}
+
+	// Note: the ftl - fastext links are fixed for now; it could be made dynamic in a future release
+	// Übersicht (100), Nachrichten (112), Sport (200), Wetter (170)
+	// aka: Overview, News, Sport, Weather
+	ftl2 := "112-0"
+	ftl3 := "200-0"
+	if strings.Contains(zdfStation, "info") || strings.Contains(zdfStation, "neo") {
+		ftl3 = "300-0"
+	}
+	ftl4 := "170-0"
+	if strings.Contains(zdfStation, "3sat") {
+		ftl2 = "500-0"
+		ftl3 = "300-0"
+		ftl4 = "400-0"
+	}
+	var output []byte
+	output = append(output, []byte(fmt.Sprintf(
+		"%v%v%v%vftl=100-0\nftl=%v\nftl=%v\nftl=%v\n<pre>", pp, np, ps, ns, ftl2, ftl3, ftl4))...)
+
+	for _, r := range rows {
+		output = append(output, r...)
+	}
+
+	output = append(output, []byte("</pre>")...)
+	os.WriteFile(filepath.Join(dirStation, pageNr), output, 0644)
+}
+
+func parseZDFRows(body io.ReadCloser, zdfStation string, pageNr string) [][]byte {
+	defer body.Close()
+
+	pageBuffer := make([][]byte, 25)
+	for i := range pageBuffer {
+		line := make([]byte, 40)
+		for j := range line {
+			line[j] = 0x20
+		}
+		pageBuffer[i] = line
+	}
+
+	rawData, err := io.ReadAll(body)
+	if err != nil {
+		return pageBuffer
+	}
+
+	z := html.NewTokenizer(strings.NewReader(string(rawData)))
+
+	currentRow := -1
+	currentCol := 0
+	prevFgCode := byte(TCC_ALPHA_WHITE)
+	prevBgCode := byte(TCC_ALPHA_BLACK)
+	isMosaic := false
+	// A span whose fg is black and has no bc attribute is a black-filler span.
+	// &nbsp; content must be suppressed; otherwise every leading filler span
+	// writes a 0x20 space and pushes all row content 20+ columns to the right.
+	skipNbsp := false
+	spaceCounter := 0
+
+	resetRowState := func() {
+		currentCol = 0
+		prevFgCode = TCC_ALPHA_WHITE
+		prevBgCode = TCC_ALPHA_BLACK
+		isMosaic = false
+		skipNbsp = false
+		spaceCounter = 0
+	}
+
+	writeAt := func(pos int, b byte) {
+		if currentRow >= 0 && currentRow < 24 && pos >= 0 && pos < 40 {
+			if pos == 39 && pageBuffer[currentRow][39] != 0x20 {
+				return
+			}
+			pageBuffer[currentRow][pos] = b
+		}
+	}
+
+	writeCurrent := func(b byte) {
+		if spaceCounter < 20 {
+			spaceCounter++
+			return
+		}
+		if currentRow >= 0 && currentRow < 24 && currentCol < 40 {
+			pageBuffer[currentRow][currentCol] = b
+			currentCol++
+		}
+	}
+
+	for {
+		tt := z.Next()
+		if tt == html.ErrorToken {
+			break
+		}
+
+		token := z.Token()
+
+		switch tt {
+
+		case html.StartTagToken:
+			switch token.Data {
+
+			case "body":
+				for _, attr := range token.Attr {
+					if attr.Key == "subpages" {
+						valInt, err := strconv.Atoi(attr.Val)
+						if err == nil {
+							numberOfSubpages = valInt
+						}
+						continue
+					}
+					if attr.Key == "prevpg" {
+						valInt, err := strconv.Atoi(attr.Val)
+						if err == nil {
+							prevPage = valInt
+						}
+						continue
+					}
+					if attr.Key == "nextpg" {
+						valInt, err := strconv.Atoi(attr.Val)
+						if err == nil {
+							nextPage = valInt
+						}
+						continue
+					}
+				}
+
+			case "div":
+				for _, attr := range token.Attr {
+					if attr.Key != "id" {
+						continue
+					}
+					if attr.Val == "headline" {
+						currentRow = 0
+						resetRowState()
+					} else if strings.HasPrefix(attr.Val, "row_") {
+						n, err := strconv.Atoi(strings.TrimPrefix(attr.Val, "row_"))
+						if err == nil {
+							currentRow = n + 1
+							resetRowState()
+						}
+					}
+				}
+
+			case "span", "a":
+				if currentRow < 0 || currentRow > 24 {
+					continue
+				}
+
+				fgHex, bgHex, mosaic := zdfExtractColors(token)
+				fgCode := zdfHexToTCC(fgHex)
+				bgCode := zdfHexToTCC(bgHex)
+				isMosaic = mosaic
+
+				if isMosaic {
+					// turn a TCC_ALPHA_xxx in a TCC_MOSAIC_xxx
+					fgCode += 0x10
+				}
+
+				skipNbsp = (fgCode == TCC_ALPHA_BLACK && bgHex == "")
+
+				// new background colour?
+				if fgHex != "" && bgHex != "" && fgCode == bgCode {
+					if bgCode != prevBgCode {
+						if currentCol > 0 {
+							writeAt(currentCol-1, fgCode)
+						}
+						writeCurrent(TCC_NEW_BACKGROUND)
+						prevFgCode = fgCode
+						prevBgCode = bgCode
+						skipNbsp = true
+					}
+					continue
+				}
+
+				// New foreground colour?
+				if fgHex != "" && fgCode != prevFgCode {
+					if currentCol > 0 && (fgCode != TCC_ALPHA_BLACK || bgHex != "") {
+						writeAt(currentCol-1, fgCode)
+					}
+					prevFgCode = fgCode
+				}
+
+				if bgHex != "" && bgCode != prevBgCode {
+					if pageNr != "100" && currentRow > 2 && currentCol > 0 {
+						if true && fgCode == TCC_ALPHA_WHITE && bgCode == TCC_ALPHA_BLACK {
+							writeAt(currentCol, TCC_BLACK_BACKGROUND)
+
+						} else {
+							writeAt(currentCol-1, bgCode)
+						}
+					}
+					writeCurrent(TCC_NEW_BACKGROUND)
+					prevBgCode = bgCode
+					prevFgCode = bgCode
+					skipNbsp = true
+				}
+			}
+
+		case html.TextToken:
+			if currentRow < 0 || currentRow >= 24 {
+				continue
+			}
+			text := token.Data
+			for _, r := range text {
+				if currentCol >= 40 {
+					break
+				}
+				switch {
+				case r == '\u00a0': // is a &nbsp;
+					if skipNbsp {
+						skipNbsp = false
+					} else {
+						writeCurrent(0x20)
+					}
+				case r < 0x20:
+					// Skip control characters
+				default:
+					var b byte
+					if r <= 0x7E {
+						b = byte(r)
+					} else {
+						b = zdfEncodeChar(r)
+					}
+					if isMosaic {
+						b = byte(r)
+					}
+					// fix letter A should be a 0xFF (solid mosaic block)
+					if isMosaic && r == 'A' {
+						writeCurrent(0xFF)
+					} else {
+						writeCurrent(b)
+					}
+				}
+			}
+		}
+	}
+
+	// post-fix weather map mosaics
+	if pageNr == "171" || pageNr == "172" {
+		for j := 0; j < 24; j++ {
+			for i := 0; i < 22; i++ {
+				if pageBuffer[j][i] == 0x60 {
+					pageBuffer[j][i] = 0xDF
+				} else {
+					if pageBuffer[j][i] >= 0xA0 {
+						pageBuffer[j][i] -= 0x20
+					}
+				}
+			}
+		}
+	}
+
+	// post-fix A-Z index pages
+	pageNum, _ := strconv.Atoi(pageNr)
+	if pageNum > 101 && pageNum < 107 {
+		// ZDFtext
+		if zdfStation == "zdf" {
+			for j := 3; j < 20; j++ {
+				if pageBuffer[j][0] == TCC_ALPHA_BLUE && pageBuffer[j][1] == TCC_NEW_BACKGROUND {
+					// The forced TCC_BLACK_BACKGROUND stops the blue background be drawn further to the right
+					pageBuffer[j][20] = TCC_BLACK_BACKGROUND
+					// If there is another index letter on the same row: shift them 1 position to the right
+					if pageBuffer[j][21] == TCC_NEW_BACKGROUND {
+						pageBuffer[j][24] = pageBuffer[j][23]
+						pageBuffer[j][23] = pageBuffer[j][22]
+						pageBuffer[j][22] = pageBuffer[j][21]
+						pageBuffer[j][21] = TCC_ALPHA_BLUE
+					}
+				}
+			}
+		} else {
+			// ZDFinfo & ZDFneo
+			if strings.Contains(zdfStation, "info") || strings.Contains(zdfStation, "neo") {
+				for j := 3; j < 22; j++ {
+					if pageBuffer[j][0] == TCC_ALPHA_BLUE && pageBuffer[j][1] == TCC_NEW_BACKGROUND {
+						pageBuffer[j][6] = TCC_BLACK_BACKGROUND
+					}
+				}
+			}
+			// 3sat
+			if strings.Contains(zdfStation, "3sat") {
+				for j := 3; j < 22; j++ {
+					if pageBuffer[j][0] == TCC_ALPHA_RED && pageBuffer[j][1] == TCC_NEW_BACKGROUND {
+						pageBuffer[j][10] = TCC_BLACK_BACKGROUND
+					}
+					// some weird shit on page 106; they start with a ALPHA_RED followed with A MOSAIC_RED
+					if pageBuffer[j][0] == TCC_ALPHA_RED && pageBuffer[j][1] == TCC_MOSAIC_RED {
+						pageBuffer[j][1] = TCC_NEW_BACKGROUND
+						pageBuffer[j][10] = TCC_BLACK_BACKGROUND
+					}
+					if pageBuffer[j][20] == TCC_ALPHA_RED && pageBuffer[j][21] == TCC_NEW_BACKGROUND {
+						pageBuffer[j][30] = TCC_BLACK_BACKGROUND
+					}
+				}
+			}
+		}
+	}
+
+	// post-fix row 1+2
+	if strings.Contains(zdfStation, "3sat") {
+		if pageNum != 100 && pageNum != 111 && pageNum != 300 && pageNum != 898 && pageNum != 899 {
+			pageBuffer[1][4] = TCC_NEW_BACKGROUND
+			pageBuffer[1][5] = TCC_ALPHA_WHITE
+			pageBuffer[2][4] = TCC_NEW_BACKGROUND
+			pageBuffer[2][5] = TCC_ALPHA_WHITE
+		}
+		if pageNum == 300 {
+			pageBuffer[1][2] = 0x20
+			pageBuffer[1][4] = TCC_ALPHA_BLACK
+			pageBuffer[1][5] = 'a'
+			pageBuffer[2][4] = 0x20
+			pageBuffer[2][5] = 0x20
+		}
+	}
+
+	// move header 4 positions to the right
+	headerSlice := make([]byte, 40)
+	copy(headerSlice, pageBuffer[0][5:])
+	copy(pageBuffer[0][5:10], bytes.Repeat([]byte{0x20}, 5))
+	copy(pageBuffer[0][9:], headerSlice)
+	// overwrite data/time from html with system date/time
+	copy(pageBuffer[0][18:], []byte(getZdfDate()))
+
+	if strings.Contains(zdfStation, "info") {
+		copy(pageBuffer[0][9:], "ZDFinfo")
+	}
+	if strings.Contains(zdfStation, "neo") {
+		copy(pageBuffer[0][9:], "ZDFneo ")
+	}
+	if strings.Contains(zdfStation, "3sat") {
+		copy(pageBuffer[0][9:], "3sat   ")
+	}
+
+	// Fixed fastest row
+	if zdfStation == "zdf" {
+		copy(pageBuffer[24][0:], "\x01\xDCbersicht \x02Nachrichten  \x03Sport  \x06Wetter")
+	} else {
+		if strings.Contains(zdfStation, "3sat") {
+			copy(pageBuffer[24][0:], "\x01\xDCbersicht  \x02Kultur   \x03Programm  \x06Wetter")
+		} else {
+			copy(pageBuffer[24][0:], "\x01\xDCbersicht\x02Nachrichten \x03Programm \x06Wetter")
+		}
+	}
+
+	return pageBuffer
+}
+
+func zdfExtractColors(token html.Token) (fg, bg string, isMosaic bool) {
+	for _, attr := range token.Attr {
+		if attr.Key != "class" {
+			continue
+		}
+		isMosaic = strings.Contains(attr.Val, "teletextlinedrawregular")
+		parts := strings.Fields(attr.Val)
+		for _, p := range parts {
+			if strings.HasPrefix(p, "bc") {
+				bg = strings.TrimPrefix(p, "bc")
+			} else if strings.HasPrefix(p, "c") {
+				fg = strings.TrimPrefix(p, "c")
+			}
+		}
+	}
+	return
+}
+
+func zdfHexToTCC(hex string) byte {
+	if len(hex) < 6 {
+		return TCC_ALPHA_WHITE
+	}
+
+	var r, g, b byte
+	fmt.Sscanf(hex[0:2], "%x", &r)
+	fmt.Sscanf(hex[2:4], "%x", &g)
+	fmt.Sscanf(hex[4:6], "%x", &b)
+
+	rOn := r == 0xFF
+	gOn := g == 0xFF
+	bOn := b == 0xFF
+
+	switch {
+	case !rOn && !gOn && !bOn:
+		return TCC_ALPHA_BLACK
+	case rOn && !gOn && !bOn:
+		return TCC_ALPHA_RED
+	case !rOn && gOn && !bOn:
+		return TCC_ALPHA_GREEN
+	case rOn && gOn && !bOn:
+		return TCC_ALPHA_YELLOW
+	case !rOn && !gOn && bOn:
+		return TCC_ALPHA_BLUE
+	case rOn && !gOn && bOn:
+		return TCC_ALPHA_MAGENTA
+	case !rOn && gOn && bOn:
+		return TCC_ALPHA_CYAN
+	default: // rOn && gOn && bOn
+		return TCC_ALPHA_WHITE
+	}
+}
+
+func zdfEncodeChar(r rune) byte {
+	switch r {
+	case 'ä':
+		return 0xE4
+	case 'ö':
+		return 0xF6
+	case 'ü':
+		return 0xFC
+	case 'Ä':
+		return 0xC4
+	case 'Ö':
+		return 0xD6
+	case 'Ü':
+		return 0xDC
+	case 'ß':
+		return 0xDF
+	case 'é':
+		return 0xE9
+	case 'è':
+		return 0xE8
+	case 'ê':
+		return 0xEA
+	case 'ë':
+		return 0xEB
+	case 'î':
+		return 0xEE
+	case 'ï':
+		return 0xEF
+	case 'à':
+		return 0xE0
+	case 'â':
+		return 0xE2
+	case 'ç':
+		return 0xE7
+	case '°':
+		return 0x60
+	default:
+		if r >= 0x20 && r <= 0x7E {
+			return byte(r)
+		}
+		return 0x20
+	}
+}
+
+func getZdfDate() string {
+	now := time.Now()
+	days := map[string]string{"Sun": "So", "Mon": "Mo", "Tue": "Di", "Wed": "Mi", "Thu": "Do", "Fri": "Fr", "Sat": "Sa"}
+	yearStr := strconv.Itoa(now.Year())
+	return fmt.Sprintf("\x02%s %02d.%02d.%s \x03%s", days[now.Format("Mon")], now.Day(), now.Month(), yearStr[2:], now.Format("15:04:05"))
 }
 
 // --- SVT Text ---
@@ -812,9 +1424,6 @@ func svttextHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 var currentPage string
-var numberOfSubpages int
-var prevSubpage int
-var nextSubpage int
 
 // This date/time stamp will be fetched from within the HTML page; it is more accurate than using the current date/time from the system
 var dateAdded string
@@ -823,7 +1432,7 @@ func svttextGetTeletexPage(pageNr string) {
 	parts := strings.Split(pageNr, "-")
 	currentPage = parts[0]
 	//url := fmt.Sprintf("https://api.texttv.nu/api/get/%s", parts[0])
-	url := fmt.Sprintf("https://l.texttv.nu/db/%s", currentPage)
+	url := fmt.Sprintf("https://l.texttv.nu/db/%s?app=teletext64u", currentPage)
 
 	logFetchingPage(url)
 	resp, err := http.Get(url)
@@ -881,6 +1490,8 @@ func svttextGetTeletexPage(pageNr string) {
 	row0[start+25] = byte(TCC_ALPHA_YELLOW)
 
 	rows[23][0] = TCC_ALPHA_RED
+	// 2 variants of the fastext layout: If we have subpages, we need some room for the
+	// subpage indicator bottom right
 	if numberOfSubpages > 1 {
 		copy(rows[23][1:], "Nyheter  Sport  V\x7Bder  Inneh\x7Dll")
 		rows[23][9] = TCC_ALPHA_GREEN
