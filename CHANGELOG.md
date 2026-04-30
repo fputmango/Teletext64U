@@ -1,5 +1,11 @@
 # **Teletext64U** changelog
 
+## [1.5.1] - 2026-04-30
+
+### Fixed
+- PetsciiProxy, SVT Text: +/- keys not working in Teletext64U due to fixed page numbers in the teletext page header (pn=p_ and pn=n_ values)
+
+
 ## [1.5.0] - 2026-04-25
 
 ### Added

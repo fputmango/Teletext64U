@@ -1431,7 +1431,7 @@ var dateAdded string
 func svttextGetTeletexPage(pageNr string) {
 	parts := strings.Split(pageNr, "-")
 	currentPage = parts[0]
-	//url := fmt.Sprintf("https://api.texttv.nu/api/get/%s", parts[0])
+	//url := fmt.Sprintf("https://api.texttv.nu/api/get/%s?app=teletext64u", parts[0])
 	url := fmt.Sprintf("https://l.texttv.nu/db/%s?app=teletext64u", currentPage)
 
 	logFetchingPage(url)
@@ -1473,8 +1473,8 @@ func svttextGetTeletexPage(pageNr string) {
 
 	var output []byte
 	output = append(output, []byte(fmt.Sprintf(
-		"pn=p_%s\npn=n_102-1\n%v%vftl=100-0\nftl=300-0\nftl=400-0\nftl=700-0\n<pre>",
-		pageNr, ps, ns))...)
+		"pn=p_\npn=n_\n%v%vftl=100-0\nftl=300-0\nftl=400-0\nftl=700-0\n<pre>",
+		ps, ns))...)
 
 	// create row 0 / header line
 	row0 := make([]byte, 40)
