@@ -1,5 +1,31 @@
 # **Teletext64U** changelog
 
+## [1.6.0] - 2026-05-16
+
+### Added
+- DR Tekst-TV (Danish teletext)
+- Æ, æ, Ø, and ø character support
+
+### Fixed PetsciiProxy
+- NOS TT: fine tuned double height / normal height post-fix on pages 703..705, 710, 711 and 713.
+- ZDFtext / ZDFinfo / ZDF_Neo / 3sat: These services stopped working on May 15. ZDF added an abuse check (but not always) before the actual teletext page is being served. I added some functions to handle and interact with these checks, if needed. With this fix these teletext services work again (for now).
+
+### Fixed Teletext64U
+- Prev/next page numbers now reset after changing stations with 'M'-key.
+- The green conceal icon in the header row is steady now (previously flashing).
+
+### Notes on DR Tekst-TV
+- This time no html/xml/tti or other format available for this teletext service to work with, only generated teletext images (https://www.dr.dk/cgi-bin/fttv1.exe/100) or plain text (https://www.dr.dk/cgi-bin/fttx2.exe/100) without any color information.
+- For this service I used the plain text service to parse the data. That was the easy part. Using plain text mode and applying colors and mosaics in post-fix was a lot of manual labour. Most -but not all- of the colors per page or page group were reconstructed.
+- https://zxnet.co.uk/teletext/editor/ was used to reconstruct some of the mosaics, like the DR-logo, DMI-logo and weather map. 
+- Because layout differs per page, and the content is not always fixed, I had to write algoritms to dynamically determine where to apply color control codes. We have to see over time how stable this is.
+-  A note about the red/yellow progress bars for DR1 and DR2 on page 100: They are accurate and calculated based on the start times of the tv-shows and the current time.
+- Page 438 has a concealed message regarding summer/winter time (press 'C' to show the message).
+
+### WiC64 support coming in the near future
+- It took some effort and it works now. Have to do some more testing before releasing. So stay tuned...
+
+
 ## [1.5.1] - 2026-04-30
 
 ### Fixed

@@ -16,6 +16,7 @@ Currently supporting:
 |ZDFinfo |Germany |
 |ZDF_neo |Germany |
 |3sat |Germany, Austria, Switzerland |
+|DR Tekst-TV |Denmark |
 
 My mission: add as many Teletext services as possible. So let me know if you have any wishes.
 
