@@ -1,5 +1,11 @@
 # **Teletext64U** changelog
 
+## [1.6.1] - 2026-05-17
+
+### Added
+- Teletext64 WiC64 edition - for BETA testing
+
+
 ## [1.6.0] - 2026-05-16
 
 ### Added

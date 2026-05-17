@@ -2,7 +2,10 @@
 
 Teletext program showing live pages from the internet for the Commodore 64 Ultimate and other Ultimate products that have networking capabilities.
 
-Currently supporting:
+### Note for WiC64 owners: 
+Added Teletext64WiC64.d64 to the target folder for beta testing! Note: should run on a stock C64 and C64U (stable below 8Mhz turbo speeds). You also need to download PetsciiProxy for you OS of choice! Find install guide in docs folder.
+
+### Currently supporting:
 
 | Service | Country |
 | :--- | :--- |
