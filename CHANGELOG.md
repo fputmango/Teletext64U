@@ -5,6 +5,9 @@
 ### Added
 - Teletext64 WiC64 edition - for BETA testing
 
+### Fixed PetsciiProxy
+- ZDF: bypasses the x509 validation check
+
 
 ## [1.6.0] - 2026-05-16
 
