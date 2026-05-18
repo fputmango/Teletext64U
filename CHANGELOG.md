@@ -1,5 +1,14 @@
 # **Teletext64U** changelog
 
+## [1.6.2] - 2026-05-18
+
+### Fixed
+- Teletext64 WiC64 edition: beta #2 should run on a stock C64 and C64 Ultimate and can handle every CPU speed: set Turbo Control to C64U Turbo Registers in the TURBO BOOST menu
+
+### Changed Teletext64U
+- Now checks the Turbo Control menu setting; gives message when not set to C64U Turbo Registers. When set, it sets the CPU to 40Mhz at startup
+
+
 ## [1.6.1] - 2026-05-17
 
 ### Added
