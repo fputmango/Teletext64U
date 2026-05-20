@@ -1,5 +1,11 @@
 # **Teletext64U** changelog
 
+## [1.6.3] - 2026-05-20
+
+### Added Teletext64 (both Ultimate and WiC64 edition)
+- menu 'M': station select list - new feature: quick select item by pressing the 1st letter of the station. Cycles through stations if there are multiple stations starting with the same letter like.
+
+
 ## [1.6.2] - 2026-05-18
 
 ### Fixed
