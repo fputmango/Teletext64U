@@ -1,5 +1,21 @@
 # **Teletext64U** changelog
 
+## [1.6.4] - 2026-05-27
+
+### Added
+- Help screen (F8)
+
+### Fixed
+- YLE Teksti-TV: é and € will be shown now
+
+### Changed
+- RunMeFirst.cfg: Turbo Control changed from Manual to C64U Turbo Registers. CPU Speed=40Mhz is removed.
+- Teletext64: Sets CPU speed to 40Mhz at runtime.
+- Teletext64: Using VIC-II bank 2 for teletext bitmap -> more available memory for extending the program with new features.  
+- Teletext64: The fonts are split up into smaller parts. Now there are seperate font files for characters and mosaics. I also created a seperate font for 'Latin National Option Sub-sets' (ETSI EN 300 706 V1.2.1), currently supporting: Englisch, French, Swedish/Finnish, German, Spanish/Portugese and Italian. This set could be extended in the future when adding new teletext services. Visible characters start at $20, everything below is used for extended ASCII character support.
+- Teletext64 Wic64 version: removed beta debug screen, so no more change in border color with error codes when a page doesn't exist. Several people have confirmed it works on both original C64s and Ultimates.
+
+
 ## [1.6.3] - 2026-05-20
 
 ### Added Teletext64 (both Ultimate and WiC64 edition)

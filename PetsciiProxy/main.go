@@ -6,7 +6,7 @@ This program acts as a middle man between the Commodore 64 Ultimate / other Ulti
 capabilities. Note: The Ultimate does not support HTTPS (yet), so direct connections to any modern secure
 website is not possible.
 
-[Teletext services]  <--HTTPS--> [PetsciiProxy] <--HTTP--> [C64U/Ultimate product]
+[Teletext services]  <--HTTPS--> [PetsciiProxy] <--HTTP--> [C64 Ultimate]
 
 Functionality:
 - HTTPS/HTTP middle man proxy
@@ -22,8 +22,10 @@ Supported teletext services:
 - SVT Text (Swedish teletext)
 - DR Tekst-TV (Danish teletext)
 
-Next up:
-- other services which can be parsed
+Next up candidates:
+- ORF (Austria) - https://text.orf.at/channel/orf1/page/100/1.html
+- RTP (Portugal) - https://www.rtp.pt/wportal/fab-txt/texto/100/100_0001.htm
+- ...?
 
 The NOS-TT file format is being used for the other teletext services:
 Is set up fairly efficient: mostly around 1073 bytes; a little bit bigger if a page has sub pages.
@@ -261,7 +263,7 @@ var entityMap = map[string]byte{
 	"iuml":   0xEF, // ï
 }
 
-// Used to determine mosaic/graphic character in ARD-TEXT
+// Used to determine mosaic/graphic character in ARD-TEXT (seems also being used at text.orf.at)
 var mosaicRe = regexp.MustCompile(`g1[a-z]([0-9a-fA-F]{2})\.gif`)
 
 func main() {
@@ -710,13 +712,20 @@ func parseARDRows(r io.Reader, correctFirstRows bool) [][]byte {
 	*/
 	resetRow()
 	row[0] = TCC_ALPHA_RED
-	copy(row[1:], "Startseite    Sport     Wetter    Borse")
+	copy(row[1:], "Startseite    Sport     Wetter    B\xF6rse") // Börse
 	row[12] = TCC_ALPHA_GREEN
 	row[22] = TCC_ALPHA_YELLOW
 	row[32] = TCC_ALPHA_CYAN
-	row[36] = 0xF6 // ö
 	rows = append(rows, row)
 
+	/*	if correctFirstRows {
+			rows[0][2] = TCC_HOLD_MOSAICS
+			rows[0][9] = 0x30
+			rows[0][10] = 0x14
+			rows[1][9] = 0x35
+			rows[2][9] = 0x21
+		}
+	*/
 	return rows
 }
 
@@ -963,12 +972,13 @@ func zdftextGetTeletexPage(pageNr string, zdfStation string, dirStation string) 
 	var reader io.ReadCloser
 	// CHECK: Did we get lucky and bypass the challenge entirely?
 	if strings.Contains(body, "ZDFtext - Seite") || strings.Contains(body, "id=\"headline\"") {
-		//fmt.Println("Bypassed challenge completely! Parsing page directly...")
+		//		fmt.Println("Bypassed challenge completely! Parsing page directly...")
 		reader = io.NopCloser(bytes.NewReader(bodyBytes))
 		gotLucky = true
 	}
 
 	if !gotLucky {
+		fmt.Println(">>Starting challenge...")
 
 		// Solve the Challenge
 		//tsMatch := regexp.MustCompile(`'ts','(\d+)'`).FindStringSubmatch(body)
@@ -1023,6 +1033,7 @@ func zdftextGetTeletexPage(pageNr string, zdfStation string, dirStation string) 
 		finalBody, _ := io.ReadAll(finalResp.Body)
 		reader = io.NopCloser(bytes.NewReader(finalBody))
 		//fmt.Println("Page content:", string(finalBody))
+		fmt.Println(">>Challenge completed")
 	}
 
 	numberOfSubpages = 0
@@ -2788,6 +2799,10 @@ func encodeTekstiChar(r rune) byte {
 		return 0x7C
 	case 'å':
 		return 0x7D
+	case 'é':
+		return 0xE9
+	case '€':
+		return 0x80
 	default:
 		if r < 128 {
 			return byte(r)
