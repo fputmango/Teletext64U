@@ -1,5 +1,29 @@
 # **Teletext64U** changelog
 
+## [1.7.0] - 2026-06-16
+
+### Added
+- Carousel support: subpages automatically rotate every 10 seconds, or after a specific cycle time set for a page (Ceefax/Teefax). Use the space bar to toggle STOP/CONTinue rotating (like on a TV-remote).
+- Subpage navigation support is available for Ceefax, Teefax, NOS-TT, ZDF, 3SAT & SVT.
+- ô character 
+- C= + 'S' toggles stopwatch ON/OFF. It's meant for testing purposes. When ON, you'll see the jiffy count bottom left (1 jiffy = 1/60 of a second) after each page is fetched and rendered.
+
+### Changed Teletext64U
+- Start screen shows version number and is more informative.
+- No more font loading at startup; all the fonts are part of the the prg now.
+- Fetching teletext pages is now significantly faster. Stock C64 users with a WiC64 will definitely notice the difference; pages load about 2.5 times faster, bringing the total fetch-and-render time to under one second! (on my system that is) Note: Stock C64 users with an Ultimate-II+ cartridge won't see this performance boost yet, as the UCI version of Teletext64U has not yet been updated with the optimized code.
+- The station select menu (M) reacts slightly faster. In the previous version the entire menu list was drawn at every key press. Now only the newly and previous selected menu items are redrawn.
+- Navigation keys are now checked while rendering a teletext page. This means that the user can change pages while the page is being fetched, resulting in faster navigation.
+- Navigating subpages wraps around now; from last subpage back to first (and vice versa if the last page is known).
+
+### Fixed Teletext64U
+- The teletext End Box control code ($0A) is handled now; in previous versions 'å' characters were displayed instead of an empty space.
+
+### Changed PetsciiProxy
+- DR Tekst-TV: Add support for VM Fodbold 2026 (world cup soccer) pages from 530 and up.
+- Ceefax/Teefax: Cycle time info from TTI data is used and stored in the new ct=n field in the teletext header part. Cycle time will be used when rotating between subpages. n is the delay in seconds.
+
+
 ## [1.6.4] - 2026-05-27
 
 ### Added
@@ -18,7 +42,7 @@
 
 ## [1.6.3] - 2026-05-20
 
-### Added Teletext64 (both Ultimate and WiC64 edition)
+### Added Teletext64U (both Ultimate and WiC64 edition)
 - menu 'M': station select list - new feature: quick select item by pressing the 1st letter of the station. Cycles through stations if there are multiple stations starting with the same letter like.
 
 
@@ -94,7 +118,7 @@
 - 'R' - Instant refresh of the current teletext page.
 - '←' - Go to previous teletext page (max. 20 steps back). Resets when changing stations.
 
-### Notes on SVE Text
+### Notes on SVT Text
 - Some of the teletext pages appear to be quite messy "under the hood"—though that may also be down to my parsing skills. Manual intervention was required on several pages to correct control codes within the code to ensure they display properly. I’m unsure if these issues stem from the API itself or its underlying source. Furthermore, the API’s handling of mosaic characters is unusual; it references GIF images using an obscure numeric coding system with hard-coded colors. While I’ve aimed for completeness, some edge cases may remain. Specifically, the graphic on the weather page (401) is currently inaccurate and requires further work.
 - Bottom row: Displays fixed Fastext links and a subpage indicator for user convenience when applicable. For some reason SVT Text rarely provides this most of the time. E.g. https://www.svt.se/text-tv/331 The official SVT Text on the web shows all the subpages at once. Maybe a subpage indicator is available on SVT Text on an actual TV.
 - Dates: The header reflects the original publishing date and time from the Teletext page. Since older pages are occasionally still hosted, any "stale" content will display the full date including the year (DD-MM-YYYY). E.g. https://texttv.nu/221 ('Hem › Ekonomi › 221').

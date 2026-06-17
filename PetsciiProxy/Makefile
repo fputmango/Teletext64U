@@ -6,3 +6,4 @@ build:
 	GOOS=windows GOARCH=amd64 go build -o ./dist/${BINARY_NAME}-windows.exe main.go
 	GOOS=linux GOARCH=386 go build -o ./dist/${BINARY_NAME}-linux-386 main.go
 	GOOS=linux GOARCH=amd64 go build -o ./dist/${BINARY_NAME}-linux-64bit main.go
+	GOOS=linux GOARCH=arm GOARM=7 go build -o ./dist/${BINARY_NAME}-raspberrypi-32bit main.go

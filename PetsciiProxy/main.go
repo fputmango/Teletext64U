@@ -3,10 +3,9 @@ Petscii Proxy server
 Developed by Frank Putman, 2026
 
 This program acts as a middle man between the Commodore 64 Ultimate / other Ultimate products with networking
-capabilities. Note: The Ultimate does not support HTTPS (yet), so direct connections to any modern secure
-website is not possible.
+capabilities / Original C64 with a WiC64.
 
-[Teletext services]  <--HTTPS--> [PetsciiProxy] <--HTTP--> [C64 Ultimate]
+[Teletext services]  <--HTTPS--> [PetsciiProxy] <--HTTP--> [C64 Ultimate/WiC64]
 
 Functionality:
 - HTTPS/HTTP middle man proxy
@@ -20,11 +19,14 @@ Supported teletext services:
 - TEEFAX (British teletext, a community based service with a huge collection of fine teletext art, historical pages and other great stuff)
 - YLE Teksti-TV (Finnish / Suomi)
 - SVT Text (Swedish teletext)
+- ZDF Text, ZDF Info, ZDF Neo (German)
+- 3SAT (German)
 - DR Tekst-TV (Danish teletext)
 
 Next up candidates:
 - ORF (Austria) - https://text.orf.at/channel/orf1/page/100/1.html
-- RTP (Portugal) - https://www.rtp.pt/wportal/fab-txt/texto/100/100_0001.htm
+- RTP teletexto (Portugal) - https://www.rtp.pt/wportal/fab-txt/texto/100/100_0001.htm
+- HR-text (German) https://www.hr-text.hr-fernsehen.de/ttxweb/?page=100
 - ...?
 
 The NOS-TT file format is being used for the other teletext services:
@@ -37,6 +39,7 @@ It looks like this:
     pn=n_521-1
     pn=ps520-1
     pn=ns520-3
+	ct=20
     ftl=101-0
     ftl=102-0
     ftl=103-0
@@ -44,6 +47,8 @@ It looks like this:
     <pre>
     ...40 columns x 25 rows = 1000 bytes of raw teletext data
     </pre>
+
+Note: the ct=n parameter was added; it's not NOS-TT native. Cycle time is used when rotating between subpages. n is the delay in seconds.
 
 Why transform to the NOS-TT format? Basically to keep things simple for the Teletext64U viewer program on the C64.
 - It only has to support one uniform way of communicating with this proxy program.
@@ -144,11 +149,24 @@ const (
 )
 
 // General vars
+/*
 var prevPage int
 var nextPage int
 var numberOfSubpages int
 var prevSubpage int
 var nextSubpage int
+*/
+// moved these vars to a struct; I found out that using global vars is very tricky because a
+// HTTP request is executed concurrently and global var assignments might lead to variable shadowing
+// The nav info gets passed around now the ensure they hold their values
+type NavignationInfo struct {
+	prevPage         int
+	nextPage         int
+	prevSubpage      int
+	nextSubpage      int
+	numberOfSubpages int
+	cycleTime        int
+}
 
 // ARD Text
 
@@ -473,6 +491,8 @@ func ardtextGetTeletexPage(pageNr string) {
 	// Note: the ftl - fastext links are fixed for now; it could be made dynamic in a future release
 	// Startseite (100), Sport (200), Wetter (171) and Börse (711)
 	// aka: start page, sport, weather, stocks
+	// Note: to support prev/next subpage numbers; the full site must be parsed: e.g. https://www.ard-text.de/index.php?page=620
+	// and detect something like this: <div id="output_unterseite" class="subpageCounter">1/3</div>
 	var output []byte
 	output = append(output, []byte("ftl=100-0\nftl=200-0\nftl=171-0\nftl=710-0\n<pre>")...)
 
@@ -1036,11 +1056,8 @@ func zdftextGetTeletexPage(pageNr string, zdfStation string, dirStation string) 
 		fmt.Println(">>Challenge completed")
 	}
 
-	numberOfSubpages = 0
-	prevPage = 0
-	nextPage = 0
-	//	rows := parseZDFRows(resp.Body, zdfStation, parts[0])
-	rows := parseZDFRows(reader, zdfStation, parts[0])
+	var nav NavignationInfo
+	rows, nav := parseZDFRows(reader, zdfStation, parts[0])
 
 	// Optional directives for (sub)page navigation
 	pp := ""
@@ -1048,22 +1065,19 @@ func zdftextGetTeletexPage(pageNr string, zdfStation string, dirStation string) 
 	ps := ""
 	ns := ""
 	subPage, _ = strconv.Atoi(parts[1])
-	prevSubpage = subPage - 1
-	nextSubpage = subPage + 1
+	nav.prevSubpage = subPage - 1
+	if subPage+2 <= nav.numberOfSubpages {
+		nav.nextSubpage = subPage + 2
+	}
 	currentPage = parts[0]
-	if numberOfSubpages > 1 {
-		if prevSubpage > 0 {
-			ps = "pn=ps" + currentPage + "-" + strconv.Itoa(prevSubpage) + "\n"
-		}
-		if nextSubpage <= numberOfSubpages {
-			ns = "pn=ns" + currentPage + "-" + strconv.Itoa(nextSubpage) + "\n"
-		}
+	if nav.numberOfSubpages > 1 {
+		ps, ns, _ = getPrevNextSubpage(parts[0], nav)
 	}
-	if prevPage > 0 {
-		pp = "pn=p_" + strconv.Itoa(prevPage) + "-1\n"
+	if nav.prevPage > 0 {
+		pp = "pn=p_" + strconv.Itoa(nav.prevPage) + "-1\n"
 	}
-	if nextPage > 0 {
-		np = "pn=n_" + strconv.Itoa(nextPage) + "-1\n"
+	if nav.nextPage > 0 {
+		np = "pn=n_" + strconv.Itoa(nav.nextPage) + "-1\n"
 	}
 
 	// Note: the ftl - fastext links are fixed for now; it could be made dynamic in a future release
@@ -1093,6 +1107,8 @@ func zdftextGetTeletexPage(pageNr string, zdfStation string, dirStation string) 
 
 }
 
+// unused; backup
+/*
 func zdftextGetTeletexPage2(pageNr string, zdfStation string, dirStation string) {
 	var url string
 	parts := strings.Split(pageNr, "-")
@@ -1172,9 +1188,12 @@ func zdftextGetTeletexPage2(pageNr string, zdfStation string, dirStation string)
 	output = append(output, []byte("</pre>")...)
 	os.WriteFile(filepath.Join(dirStation, pageNr), output, 0644)
 }
+*/
 
-func parseZDFRows(body io.ReadCloser, zdfStation string, pageNr string) [][]byte {
+func parseZDFRows(body io.ReadCloser, zdfStation string, pageNr string) ([][]byte, NavignationInfo) {
 	defer body.Close()
+
+	var nav NavignationInfo
 
 	pageBuffer := make([][]byte, 25)
 	for i := range pageBuffer {
@@ -1187,7 +1206,7 @@ func parseZDFRows(body io.ReadCloser, zdfStation string, pageNr string) [][]byte
 
 	rawData, err := io.ReadAll(body)
 	if err != nil {
-		return pageBuffer
+		return pageBuffer, nav
 	}
 
 	z := html.NewTokenizer(strings.NewReader(string(rawData)))
@@ -1250,21 +1269,21 @@ func parseZDFRows(body io.ReadCloser, zdfStation string, pageNr string) [][]byte
 					if attr.Key == "subpages" {
 						valInt, err := strconv.Atoi(attr.Val)
 						if err == nil {
-							numberOfSubpages = valInt
+							nav.numberOfSubpages = valInt
 						}
 						continue
 					}
 					if attr.Key == "prevpg" {
 						valInt, err := strconv.Atoi(attr.Val)
 						if err == nil {
-							prevPage = valInt
+							nav.prevPage = valInt
 						}
 						continue
 					}
 					if attr.Key == "nextpg" {
 						valInt, err := strconv.Atoi(attr.Val)
 						if err == nil {
-							nextPage = valInt
+							nav.nextPage = valInt
 						}
 						continue
 					}
@@ -1488,7 +1507,7 @@ func parseZDFRows(body io.ReadCloser, zdfStation string, pageNr string) [][]byte
 		}
 	}
 
-	return pageBuffer
+	return pageBuffer, nav
 }
 
 func zdfExtractColors(token html.Token) (fg, bg string, isMosaic bool) {
@@ -1626,7 +1645,7 @@ func svttextGetTeletexPage(pageNr string) {
 	}
 
 	// parse all rows; also gives information about the number of subpages
-	rows, err := parseSVTRows(resp.Body, parts[1])
+	rows, nav, err := parseSVTRows(resp.Body, parts[1])
 	if err != nil {
 		fmt.Println(err.Error())
 		return
@@ -1639,15 +1658,18 @@ func svttextGetTeletexPage(pageNr string) {
 	ps := ""
 	ns := ""
 	subPageIndicator := ""
-	nextSubpage = prevSubpage + 2
-	if numberOfSubpages > 1 {
-		subPageIndicator = "(" + strconv.Itoa(prevSubpage+1) + "/" + strconv.Itoa(numberOfSubpages) + ")"
-		if prevSubpage > 0 {
-			ps = "pn=ps" + currentPage + "-" + strconv.Itoa(prevSubpage) + "\n"
-		}
-		if nextSubpage <= numberOfSubpages {
-			ns = "pn=ns" + currentPage + "-" + strconv.Itoa(nextSubpage) + "\n"
-		}
+	nav.nextSubpage = nav.prevSubpage + 2
+	if nav.numberOfSubpages > 1 {
+		subPageIndicator = "(" + strconv.Itoa(nav.prevSubpage+1) + "/" + strconv.Itoa(nav.numberOfSubpages) + ")"
+		/*
+			if prevSubpage > 0 {
+				ps = "pn=ps" + currentPage + "-" + strconv.Itoa(prevSubpage) + "\n"
+			}
+			if nextSubpage <= numberOfSubpages {
+				ns = "pn=ns" + currentPage + "-" + strconv.Itoa(nextSubpage) + "\n"
+			}
+		*/
+		ps, ns, _ = getPrevNextSubpage(parts[0], nav)
 	}
 
 	var output []byte
@@ -1671,7 +1693,7 @@ func svttextGetTeletexPage(pageNr string) {
 	rows[23][0] = TCC_ALPHA_RED
 	// 2 variants of the fastext layout: If we have subpages, we need some room for the
 	// subpage indicator bottom right
-	if numberOfSubpages > 1 {
+	if nav.numberOfSubpages > 1 {
 		copy(rows[23][1:], "Nyheter  Sport  V\x7Bder  Inneh\x7Dll")
 		rows[23][9] = TCC_ALPHA_GREEN
 		rows[23][16] = TCC_ALPHA_YELLOW
@@ -1714,8 +1736,10 @@ var huidigeRij int // aka currentRow
 
 const MAXRIJ = 25
 
-func parseSVTRows(body io.ReadCloser, subpageStr string) ([][]byte, error) {
+func parseSVTRows(body io.ReadCloser, subpageStr string) ([][]byte, NavignationInfo, error) {
 	defer body.Close()
+
+	var nav NavignationInfo
 
 	ignoreFirst = true
 	checkText = false
@@ -1744,14 +1768,14 @@ func parseSVTRows(body io.ReadCloser, subpageStr string) ([][]byte, error) {
 
 	rawData, err := io.ReadAll(body)
 	if err != nil {
-		return nil, err
+		return nil, nav, err
 	}
 	// Turns \" into " and \/ into /
 	cleanHTML := strings.ReplaceAll(string(rawData), "\\", "")
 
 	// In SVT Text every pages between 100..899 always exists; we have to check this text; bail out if page is not available
 	if strings.Contains(cleanHTML, "Sidan ej") {
-		return nil, errors.New("page not available")
+		return nil, nav, errors.New("page not available")
 	}
 
 	z := html.NewTokenizer(strings.NewReader(cleanHTML))
@@ -1767,7 +1791,7 @@ func parseSVTRows(body io.ReadCloser, subpageStr string) ([][]byte, error) {
 			if z.Err() == io.EOF {
 				break
 			}
-			return nil, z.Err()
+			return nil, nav, z.Err()
 		}
 
 		token := z.Token()
@@ -1788,14 +1812,14 @@ func parseSVTRows(body io.ReadCloser, subpageStr string) ([][]byte, error) {
 						rootCount++
 						if rootCount == targetSub {
 							inTargetSubpage = true
-							prevSubpage = rootCount
+							nav.prevSubpage = rootCount
 							break
 						} else {
 							inTargetSubpage = false
 						}
 					}
 				}
-				numberOfSubpages = rootCount + 1
+				nav.numberOfSubpages = rootCount + 1
 			}
 
 			if !inTargetSubpage {
@@ -1832,7 +1856,7 @@ func parseSVTRows(body io.ReadCloser, subpageStr string) ([][]byte, error) {
 					prevFgCode = 0xFF
 					prevFGMosaicCode = 0xFF
 					if currentRow >= 24 {
-						return pageBuffer, nil
+						return pageBuffer, nav, nil
 					}
 				}
 
@@ -1898,7 +1922,7 @@ func parseSVTRows(body io.ReadCloser, subpageStr string) ([][]byte, error) {
 		}
 	}
 
-	return pageBuffer, nil
+	return pageBuffer, nav, nil
 }
 
 func handleSVTStyles(classes string, row []byte, col *int) {
@@ -2312,11 +2336,13 @@ func ceefaxGetTeletexPage(pageNr string) {
 		return
 	}
 
-	rows := parseTTIRows(resp.Body, parts[0], parts[1], true) // parts[1] = subpagenumber
+	rows, nav := parseTTIRows(resp.Body, parts[0], parts[1], true) // parts[1] = subpagenumber
+	ps, ns, ct := getPrevNextSubpage(parts[0], nav)
 
 	var output []byte
 	output = append(output, []byte(fmt.Sprintf(
-		"pn=p_\npn=n_\nftl=%v-0\nftl=%v-0\nftl=%v-0\nftl=%v-0\n<pre>",
+		"pn=p_\npn=n_\n%v%v%vftl=%v-0\nftl=%v-0\nftl=%v-0\nftl=%v-0\n<pre>",
+		ps, ns, ct,
 		string(ftl[0]), string(ftl[1]), string(ftl[2]), string(ftl[3])))...)
 
 	for _, r := range rows {
@@ -2351,11 +2377,13 @@ func teefaxGetTeletexPage(pageNr string) {
 		return
 	}
 
-	rows := parseTTIRows(resp.Body, parts[0], parts[1], false) // parts[1] = subpagenumber
+	rows, nav := parseTTIRows(resp.Body, parts[0], parts[1], false) // parts[1] = subpagenumber
+	ps, ns, ct := getPrevNextSubpage(parts[0], nav)
 
 	var output []byte
 	output = append(output, []byte(fmt.Sprintf(
-		"pn=p_\npn=n_\nftl=%v-0\nftl=%v-0\nftl=%v-0\nftl=%v-0\n<pre>",
+		"pn=p_\npn=n_\n%v%v%vftl=%v-0\nftl=%v-0\nftl=%v-0\nftl=%v-0\n<pre>",
+		ps, ns, ct,
 		string(ftl[0]), string(ftl[1]), string(ftl[2]), string(ftl[3])))...)
 
 	for _, r := range rows {
@@ -2366,12 +2394,38 @@ func teefaxGetTeletexPage(pageNr string) {
 	os.WriteFile(filepath.Join(DirTEEFAX, pageNr), output, 0644)
 }
 
+// currently used by ceefax, teefax, zdf, svt
+func getPrevNextSubpage(pageNr string, nav NavignationInfo) (string, string, string) {
+	prev := ""
+	next := ""
+	cycletime := ""
+	//	if prevSubpage > 0 && nextSubpage > 1 && prevSubpage < nextSubpage {
+	if nav.prevSubpage > 0 {
+		prev = "pn=ps" + pageNr + "-" + strconv.Itoa(nav.prevSubpage) + "\n"
+	}
+	if nav.nextSubpage > 0 {
+		if nav.numberOfSubpages == 0 || nav.nextSubpage <= nav.numberOfSubpages {
+			next = "pn=ns" + pageNr + "-" + strconv.Itoa(nav.nextSubpage) + "\n"
+		}
+	}
+	if nav.cycleTime > 0 {
+		cycletime = "ct=" + strconv.Itoa(nav.cycleTime) + "\n"
+	}
+	return prev, next, cycletime
+}
+
 var subpage byte
 var fullDoubleHeightRow bool
 
-func parseTTIRows(r io.Reader, pageStr string, subpageStr string, isCEEFAX bool) [][]byte {
+func parseTTIRows(r io.Reader, pageStr string, subpageStr string, isCEEFAX bool) ([][]byte, NavignationInfo) {
 	subpageFound := false
 	escFound := false
+	//subpageCarouselFound := false
+
+	var nav NavignationInfo
+	nav.nextSubpage = 0
+	nav.prevSubpage = 0
+	nav.cycleTime = 0
 
 	// Create an empty teletext page, fill it with spaces.
 	// The reason why I do this is because in the TTI format only the rows which have actual data are
@@ -2391,6 +2445,7 @@ func parseTTIRows(r io.Reader, pageStr string, subpageStr string, isCEEFAX bool)
 	subpage, _ := strconv.Atoi(subpageStr)
 
 	for _, line := range lines {
+		//fmt.Println(string(line))
 		// A TTI format teletext line looks something like this: OL,23, D ] CCATCH UP WITH REGIONAL NEWS       G160
 		parts := bytes.SplitN(line, []byte(","), 3)
 
@@ -2400,19 +2455,49 @@ func parseTTIRows(r io.Reader, pageStr string, subpageStr string, isCEEFAX bool)
 			teletextpage starts with a PN, e.g. PN,10203. Where 102 is the page number and 03 is the subpage
 		*/
 		if bytes.HasPrefix(parts[0], []byte("PN")) {
-			if subpageFound {
-				break
-			}
 			// format XXXYY; subpage is last two YY digits
 			subpageNumber := parts[1][3:]
 			s := string(subpageNumber)
 			val, _ := strconv.Atoi(s)
+			if subpageFound {
+				nav.nextSubpage = val
+				break
+			}
 			if (subpage == 0 || subpage == 1) && val == 1 {
 				subpageFound = true
 			}
 			if val == 0 || val == subpage {
+				if val > 1 {
+					nav.prevSubpage = val - 1
+				}
 				subpageFound = true
 			}
+		}
+
+		// SC=Subpage Carousel indicator; if a page has subpages the subcode value is > 0
+		if nav.cycleTime == 0 && bytes.HasPrefix(parts[0], []byte("SC")) {
+			// parts[1] = subcode
+			subcodeStr := string(parts[1])
+			subcode, _ := strconv.Atoi(subcodeStr)
+			if subcode > 0 {
+				//subpageCarouselFound = true
+				// set default cycle time to 5 seconds; this value may be adjusted if the page has a CT command (see below)
+				// note: this value is deducted by looking at NMS Ceefax and time how long each subpage is shown
+				nav.cycleTime = 5
+				fmt.Printf("SC/Subpage Carousel indicator encountered:%v cycleTime set to:%v\n", subcode, nav.cycleTime)
+			}
+		}
+
+		if bytes.HasPrefix(parts[0], []byte("CT")) {
+			// parts[1] = cycle time in seconds
+			// parts[2] = T=text; C=Clear/Erase previous page from memory; S=Subtitle
+			cycletimeStr := string(parts[1])
+			cycletime, _ := strconv.Atoi(cycletimeStr)
+			nav.cycleTime = cycletime
+			fmt.Printf("CT; cycleTime set to:%v\n", nav.cycleTime)
+			// 199: CT,2,C
+			// 528: CT,20,T
+			// 100: No CT indicator -> cycle time is the default value of 5s
 		}
 
 		// Actual teletext lines start with an OL
@@ -2476,7 +2561,7 @@ func parseTTIRows(r io.Reader, pageStr string, subpageStr string, isCEEFAX bool)
 		timeStr := formatTime(0, false)
 		copy(rows[0][21:], timeStr)
 	}
-	return rows
+	return rows, nav
 }
 
 func bytesToLatin1String(b []byte) string {
@@ -2984,13 +3069,12 @@ func parseDRRows(body io.ReadCloser, pageNr string, subPageNr string) ([][]byte,
 		count := 0
 		for _, m := range allPageNumbers {
 			count++
-			if count > 1 && pageBuffer[row][m[0]-1] != '-' {
+			if count > 1 && pageBuffer[row][m[0]-1] != '-' && pageBuffer[row][m[0]-2] == 0x20 {
 				pageBuffer[row][m[0]-3] = TCC_MOSAIC_BLACK
 				pageBuffer[row][m[0]-2] = 0x35
 			}
 
 		}
-
 	}
 
 	// if row == 0 it draws the big block, else a single row block
@@ -3185,7 +3269,7 @@ func parseDRRows(body io.ReadCloser, pageNr string, subPageNr string) ([][]byte,
 
 	}
 
-	if (pageNum >= 101 && pageNum <= 104) || (pageNum >= 314 && pageNum <= 359) || (pageNum >= 502 && pageNum <= 530) ||
+	if (pageNum >= 101 && pageNum <= 104) || (pageNum >= 314 && pageNum <= 359) || (pageNum >= 502 && pageNum < 530) ||
 		(pageNum >= 552 && pageNum < 570) || (pageNum >= 609 && pageNum < 630) {
 		if pageNum < 600 {
 			DRbox(TCC_ALPHA_RED, 1, TCC_ALPHA_CYAN)
@@ -3498,11 +3582,34 @@ func parseDRRows(body io.ReadCloser, pageNr string, subPageNr string) ([][]byte,
 		bottomBlock(TCC_MOSAIC_BLUE, 0)
 	}
 
-	if pageNum == 201 || (pageNum >= 660 && pageNum <= 695) {
+	if pageNum == 201 || (pageNum >= 660 && pageNum <= 695) || (pageNum > 530 && pageNum < 550) {
 		drawSportHeader(1)
 		detectTwoCapitals()
 		detectSportScores()
 		whiteSeperatedBoxes(23)
+	}
+
+	// VM Fodbold 2026
+	if pageNum == 530 {
+		drawSportHeader(1)
+		pageBuffer[3][0] = TCC_ALPHA_CYAN
+		detectTwoCapitals()
+		detectSportScores()
+		for row := 20; row < 24; row++ {
+			for col := 0; col < 40; col++ {
+				if pageBuffer[row][col] == TCC_ALPHA_YELLOW {
+					pageBuffer[row][col] = 0x20
+				}
+			}
+			pageBuffer[row][0] = TCC_ALPHA_WHITE
+			pageBuffer[row][1] = TCC_NEW_BACKGROUND
+			pageBuffer[row][2] = TCC_ALPHA_RED
+			pageBuffer[row][11] = TCC_ALPHA_BLACK
+			pageBuffer[row][19] = TCC_MOSAIC_BLACK
+			pageBuffer[row][20] = 0x35
+			pageBuffer[row][21] = TCC_ALPHA_RED
+			pageBuffer[row][32] = TCC_ALPHA_BLACK
+		}
 	}
 
 	if pageNum == 202 {

@@ -26,6 +26,7 @@ With this program you configure:
 |UP | Subpage up |
 |DN | Subpage down |
 |R | Refresh current teletext page |
+|Space | Stop/Continue auto rotating subpages |
 |B | Bold font |
 |T | Thin font |
 |S | Switch station (carousel) |
