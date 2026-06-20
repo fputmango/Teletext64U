@@ -23,6 +23,8 @@ The program also runs on an original stock C64/C128 in C64 mode with a WiC64 or 
 
 My mission: add as many Teletext services as possible. So let me know if you have any wishes.
 
+Currently working on: ORF 1, ORF 2, ORF III and ORF Sport+
+
 ## Description
 100% teletext compliant by using proper teletext character sets including the special graphic (mosaic) characters and support for the most common diacrits / accent marks. It runs in hires bitmap mode to support all the required foreground/background color combinations. To make the look & feel even more authentic, it can be used with a super bright RGB palette; so no washed out default C64 colors.
 
