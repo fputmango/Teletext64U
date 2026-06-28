@@ -22,6 +22,7 @@ Supported teletext services:
 - ZDF Text, ZDF Info, ZDF Neo (German)
 - 3SAT (German)
 - DR Tekst-TV (Danish teletext)
+- ORF 1, ORF 2, ORF III, ORF Sport+ (Austria)
 
 Next up candidates:
 - ORF (Austria) - https://text.orf.at/channel/orf1/page/100/1.html
@@ -59,6 +60,7 @@ Why transform to the NOS-TT format? Basically to keep things simple for the Tele
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"crypto/tls"
 	"encoding/xml"
@@ -67,10 +69,12 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -81,34 +85,45 @@ import (
 	"golang.org/x/net/html"
 )
 
+// Version
+const pp_version = "1.8.0"
+
 // Supported teletext services
 const (
-	DirNOS     = "NOS-TT"
-	DirARD     = "ARD-TEXT"
-	DirZDF     = "ZDF-TEXT"
-	DirZDFinfo = "ZDFINFO"
-	DirZDFneo  = "ZDFNEO"
-	Dir3sat    = "3SAT"
-	DirCEEFAX  = "CEEFAX"
-	DirTEEFAX  = "TEEFAX"
-	DirTEKSTI  = "TEKSTI-TV"
-	DirSVT     = "SVT-TEXT"
-	DirDR      = "DR-TEKST-TV"
+	DirNOS      = "NOS-TT"
+	DirARD      = "ARD-TEXT"
+	DirZDF      = "ZDF-TEXT"
+	DirZDFinfo  = "ZDFINFO"
+	DirZDFneo   = "ZDFNEO"
+	Dir3sat     = "3SAT"
+	DirORF1     = "ORF1"
+	DirORF2     = "ORF2"
+	DirORF3     = "ORF3"
+	DirORFSport = "ORFSPORT"
+	DirCEEFAX   = "CEEFAX"
+	DirTEEFAX   = "TEEFAX"
+	DirTEKSTI   = "TEKSTI-TV"
+	DirSVT      = "SVT-TEXT"
+	DirDR       = "DR-TEKST-TV"
 )
 
 // Each service has its own handler
 var handlers = map[string]http.HandlerFunc{
-	DirNOS:     nosttHandler,
-	DirARD:     ardtextHandler,
-	DirZDF:     zdftextHandler,
-	DirZDFinfo: zdfinfoHandler,
-	DirZDFneo:  zdfneoHandler,
-	Dir3sat:    zdf3satHandler,
-	DirCEEFAX:  ceefaxHandler,
-	DirTEEFAX:  teefaxHandler,
-	DirTEKSTI:  tekstiHandler,
-	DirSVT:     svttextHandler,
-	DirDR:      drteksttvHandler,
+	DirNOS:      nosttHandler,
+	DirARD:      ardtextHandler,
+	DirZDF:      zdftextHandler,
+	DirZDFinfo:  zdfinfoHandler,
+	DirZDFneo:   zdfneoHandler,
+	Dir3sat:     zdf3satHandler,
+	DirORF1:     orf1Handler,
+	DirORF2:     orf2Handler,
+	DirORF3:     orf3Handler,
+	DirORFSport: orfSportHandler,
+	DirCEEFAX:   ceefaxHandler,
+	DirTEEFAX:   teefaxHandler,
+	DirTEKSTI:   tekstiHandler,
+	DirSVT:      svttextHandler,
+	DirDR:       drteksttvHandler,
 }
 
 // Teletext control codes (range 0x00..0x1F); Alpha is a regular character; a mosaic is a graphics character
@@ -148,14 +163,6 @@ const (
 	TCC_RELEASE_MOSAICS    = 0x1F
 )
 
-// General vars
-/*
-var prevPage int
-var nextPage int
-var numberOfSubpages int
-var prevSubpage int
-var nextSubpage int
-*/
 // moved these vars to a struct; I found out that using global vars is very tricky because a
 // HTTP request is executed concurrently and global var assignments might lead to variable shadowing
 // The nav info gets passed around now the ensure they hold their values
@@ -169,7 +176,6 @@ type NavignationInfo struct {
 }
 
 // ARD Text
-
 // These characters are used in ARD-TEXT html classes, e.g. class='fgy bgb' means yellow character on a black background
 var ardColorMap = map[string]byte{
 	"b ": 0, // black, note: I have added black twice with an explicit space and single quote to prevent
@@ -284,6 +290,40 @@ var entityMap = map[string]byte{
 // Used to determine mosaic/graphic character in ARD-TEXT (seems also being used at text.orf.at)
 var mosaicRe = regexp.MustCompile(`g1[a-z]([0-9a-fA-F]{2})\.gif`)
 
+// getClientIP extracts the real IP address from the request
+func getClientIP(r *http.Request) string {
+	// Check for X-Forwarded-For proxy header first
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		ips := strings.Split(xff, ",")
+		return strings.TrimSpace(ips[0]) // First IP is always the original client
+	}
+
+	// Fallback to X-Real-IP
+	if realIP := r.Header.Get("X-Real-IP"); realIP != "" {
+		return realIP
+	}
+
+	// Ultimate fallback to RemoteAddr (and strip the port)
+	ip, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr // return unparsed if splitting fails
+	}
+	return ip
+}
+
+// ipLoggingMiddleware logs the client IP for every incoming request
+func ipLoggingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		now := time.Now()
+		clientIP := getClientIP(r)
+		// Log the IP along with the request method and path
+		//		fmt.Printf("%v [CONN] Client IP: %-15s | Request: %s %s", now.Format("2006-01-02 15:04:05"), clientIP, r.Method, r.URL.Path)
+		fmt.Printf("%v Client IP: %-15s", now.Format("2006-01-02 15:04:05"), clientIP)
+		// Pass the request along to the actual handler
+		next.ServeHTTP(w, r)
+	})
+}
+
 func main() {
 	var err error
 
@@ -325,10 +365,10 @@ If you do not have one, you can request one here: https://developer.yle.fi/en/in
 		mux.HandleFunc(fmt.Sprintf("/%s/{id}", name), handler)
 	}
 
-	fmt.Printf("Teletext PetsciiProxy Go server, serving on port %d\n", port)
+	fmt.Printf("Teletext PetsciiProxy server v%v, serving on port %d\n", pp_version, port)
 
 	address := fmt.Sprintf(":%d", port)
-	err = http.ListenAndServe(address, mux)
+	err = http.ListenAndServe(address, ipLoggingMiddleware(mux))
 	if err != nil {
 		fmt.Println("Server error:", err)
 	}
@@ -473,6 +513,36 @@ func ardtextHandler(w http.ResponseWriter, r *http.Request) {
 	writeResponse(w, DirARD, pageName)
 }
 
+func ardtextHasNextSubpage(page string, subpage string) int {
+	subpageNumber, err := strconv.Atoi(subpage)
+	if err != nil {
+		return -1
+	}
+	if subpageNumber < 2 {
+		subpageNumber = 2
+	} else {
+		subpageNumber++
+	}
+
+	url := fmt.Sprintf("https://www.ard-text.de/page_only.php?page=%s&sub=%v", page, subpageNumber)
+	resp, err := http.Get(url)
+	if err != nil {
+		return -1
+	}
+	defer resp.Body.Close()
+
+	reader := bufio.NewReader(resp.Body)
+
+	line, err := reader.ReadString('\n')
+	if err != nil && err != io.EOF {
+		return -1
+	}
+	if len(line) < 150 {
+		return -1
+	}
+	return subpageNumber
+}
+
 func ardtextGetTeletexPage(pageNr string) {
 	parts := strings.Split(pageNr, "-")
 	url := fmt.Sprintf("https://www.ard-text.de/page_only.php?page=%s&sub=%s", parts[0], parts[1])
@@ -488,13 +558,20 @@ func ardtextGetTeletexPage(pageNr string) {
 		return
 	}
 
+	// determine number of subpages
+	var nav NavignationInfo
+	nav.nextSubpage = ardtextHasNextSubpage(parts[0], parts[1])
+	ps, ns, ct := getPrevNextSubpage(parts[0], nav)
+
 	// Note: the ftl - fastext links are fixed for now; it could be made dynamic in a future release
 	// Startseite (100), Sport (200), Wetter (171) and Börse (711)
 	// aka: start page, sport, weather, stocks
 	// Note: to support prev/next subpage numbers; the full site must be parsed: e.g. https://www.ard-text.de/index.php?page=620
 	// and detect something like this: <div id="output_unterseite" class="subpageCounter">1/3</div>
 	var output []byte
-	output = append(output, []byte("ftl=100-0\nftl=200-0\nftl=171-0\nftl=710-0\n<pre>")...)
+	output = append(output, []byte(fmt.Sprintf(
+		"%v%v%vftl=100-0\nftl=200-0\nftl=171-0\nftl=710-0\n<pre>",
+		ps, ns, ct))...)
 
 	row0 := make([]byte, 40)
 	for i := range row0 {
@@ -1107,89 +1184,6 @@ func zdftextGetTeletexPage(pageNr string, zdfStation string, dirStation string) 
 
 }
 
-// unused; backup
-/*
-func zdftextGetTeletexPage2(pageNr string, zdfStation string, dirStation string) {
-	var url string
-	parts := strings.Split(pageNr, "-")
-	subPage, _ := strconv.Atoi(parts[1])
-
-	if subPage < 2 {
-		url = fmt.Sprintf("https://teletext.zdf.de/teletext/%s/seiten/klassisch/%s.html", zdfStation, parts[0])
-	} else {
-		subPage--
-		subStr := strconv.Itoa(subPage)
-		url = fmt.Sprintf("https://teletext.zdf.de/teletext/%s/seiten/klassisch/%s_%s.html", zdfStation, parts[0], subStr)
-	}
-
-	logFetchingPage(url)
-	resp, err := http.Get(url)
-	if err != nil {
-		return
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		fmt.Println("HTTP Error: Could not retrieve page", pageNr, "Status:", resp.StatusCode)
-		return
-	}
-
-	numberOfSubpages = 0
-	prevPage = 0
-	nextPage = 0
-	rows := parseZDFRows(resp.Body, zdfStation, parts[0])
-
-	// optional directives for (sub)page navigation
-	pp := ""
-	np := ""
-	ps := ""
-	ns := ""
-	subPage, _ = strconv.Atoi(parts[1])
-	prevSubpage = subPage - 1
-	nextSubpage = subPage + 1
-	currentPage = parts[0]
-	if numberOfSubpages > 1 {
-		if prevSubpage > 0 {
-			ps = "pn=ps" + currentPage + "-" + strconv.Itoa(prevSubpage) + "\n"
-		}
-		if nextSubpage <= numberOfSubpages {
-			ns = "pn=ns" + currentPage + "-" + strconv.Itoa(nextSubpage) + "\n"
-		}
-	}
-	if prevPage > 0 {
-		pp = "pn=p_" + strconv.Itoa(prevPage) + "-1\n"
-	}
-	if nextPage > 0 {
-		np = "pn=n_" + strconv.Itoa(nextPage) + "-1\n"
-	}
-
-	// Note: the ftl - fastext links are fixed for now; it could be made dynamic in a future release
-	// Übersicht (100), Nachrichten (112), Sport (200), Wetter (170)
-	// aka: Overview, News, Sport, Weather
-	ftl2 := "112-0"
-	ftl3 := "200-0"
-	if strings.Contains(zdfStation, "info") || strings.Contains(zdfStation, "neo") {
-		ftl3 = "300-0"
-	}
-	ftl4 := "170-0"
-	if strings.Contains(zdfStation, "3sat") {
-		ftl2 = "500-0"
-		ftl3 = "300-0"
-		ftl4 = "400-0"
-	}
-	var output []byte
-	output = append(output, []byte(fmt.Sprintf(
-		"%v%v%v%vftl=100-0\nftl=%v\nftl=%v\nftl=%v\n<pre>", pp, np, ps, ns, ftl2, ftl3, ftl4))...)
-
-	for _, r := range rows {
-		output = append(output, r...)
-	}
-
-	output = append(output, []byte("</pre>")...)
-	os.WriteFile(filepath.Join(dirStation, pageNr), output, 0644)
-}
-*/
-
 func parseZDFRows(body io.ReadCloser, zdfStation string, pageNr string) ([][]byte, NavignationInfo) {
 	defer body.Close()
 
@@ -1400,16 +1394,15 @@ func parseZDFRows(body io.ReadCloser, zdfStation string, pageNr string) ([][]byt
 		}
 	}
 
-	// post-fix weather map mosaics
+	// post-fix weather map; update 27-06-2026 v1.8.0
 	if pageNr == "171" || pageNr == "172" {
-		for j := 0; j < 24; j++ {
-			for i := 0; i < 22; i++ {
-				if pageBuffer[j][i] == 0x60 {
-					pageBuffer[j][i] = 0xDF
-				} else {
-					if pageBuffer[j][i] >= 0xA0 {
-						pageBuffer[j][i] -= 0x20
-					}
+		for j := 6; j < 21; j++ {
+			pageBuffer[j][0] = TCC_SEPERATED_MOSAICS
+			pageBuffer[j][1] = TCC_HOLD_MOSAICS
+			pageBuffer[j][19] = TCC_RELEASE_MOSAICS
+			for i := 2; i < 20; i++ {
+				if pageBuffer[j][i] >= 0xA0 {
+					pageBuffer[j][i] -= 0x80
 				}
 			}
 		}
@@ -1417,6 +1410,21 @@ func parseZDFRows(body io.ReadCloser, zdfStation string, pageNr string) ([][]byt
 
 	// post-fix A-Z index pages
 	pageNum, _ := strconv.Atoi(pageNr)
+
+	if zdfStation == "zdfinfo" {
+		excludedPages := []int{100, 111, 171, 333}
+		if !(slices.Contains(excludedPages, pageNum) || (pageNum > 555 && pageNum < 600)) {
+			pageBuffer[2][12] = TCC_BLACK_BACKGROUND
+		}
+	}
+
+	if zdfStation == "zdfneo" {
+		excludedPages := []int{100, 111, 333}
+		if !(slices.Contains(excludedPages, pageNum) || (pageNum > 555 && pageNum < 600)) {
+			pageBuffer[2][12] = TCC_BLACK_BACKGROUND
+		}
+	}
+
 	if pageNum > 101 && pageNum < 107 {
 		// ZDFtext
 		if zdfStation == "zdf" {
@@ -1562,6 +1570,7 @@ func zdfHexToTCC(hex string) byte {
 	}
 }
 
+// also used for ORF stations
 func zdfEncodeChar(r rune) byte {
 	switch r {
 	case 'ä':
@@ -1613,6 +1622,349 @@ func getZdfDate() string {
 	return fmt.Sprintf("\x02%s %02d.%02d.%s \x03%s", days[now.Format("Mon")], now.Day(), now.Month(), yearStr[2:], now.Format("15:04:05"))
 }
 
+// --- ORF text---
+
+func orf1Handler(w http.ResponseWriter, r *http.Request) {
+	pageName := getPageName(r, DirORF1)
+	orfGetTeletexPage(pageName, "orf1", DirORF1)
+	writeResponse(w, DirORF1, pageName)
+}
+
+func orf2Handler(w http.ResponseWriter, r *http.Request) {
+	pageName := getPageName(r, DirORF2)
+	orfGetTeletexPage(pageName, "orf2", DirORF2)
+	writeResponse(w, DirORF2, pageName)
+}
+
+func orf3Handler(w http.ResponseWriter, r *http.Request) {
+	pageName := getPageName(r, DirORF3)
+	orfGetTeletexPage(pageName, "orfiii", DirORF3)
+	writeResponse(w, DirORF3, pageName)
+}
+
+func orfSportHandler(w http.ResponseWriter, r *http.Request) {
+	pageName := getPageName(r, DirORFSport)
+	orfGetTeletexPage(pageName, "sportplus", DirORFSport)
+	writeResponse(w, DirORFSport, pageName)
+}
+
+func orfGetTeletexPage(pageNr string, station string, dirStation string) {
+	var url string
+	parts := strings.Split(pageNr, "-")
+	subPage, _ := strconv.Atoi(parts[1])
+
+	if subPage < 2 {
+		url = fmt.Sprintf("https://text.orf.at/channel/%s/page/%s/1.html", station, parts[0])
+	} else {
+		subStr := strconv.Itoa(subPage)
+		url = fmt.Sprintf("https://text.orf.at/channel/%s/page/%s/%s.html", station, parts[0], subStr)
+	}
+
+	logFetchingPage(url)
+	resp, err := http.Get(url)
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		fmt.Println("HTTP Error: Could not retrieve page", pageNr, "Status:", resp.StatusCode)
+		return
+	}
+
+	var nav NavignationInfo
+	rows, nav := parseORFRows(resp.Body, station, parts[0])
+
+	// Optional directives for (sub)page navigation
+	pp := ""
+	np := ""
+	ps := ""
+	ns := ""
+	ct := ""
+	currentPage = parts[0]
+	ps, ns, ct = getPrevNextSubpage(parts[0], nav)
+	if nav.prevPage > 0 {
+		pp = "pn=p_" + strconv.Itoa(nav.prevPage) + "-1\n"
+	}
+	if nav.nextPage > 0 {
+		np = "pn=n_" + strconv.Itoa(nav.nextPage) + "-1\n"
+	}
+
+	ftl1 := "100-0" // ORF 1, 2 and 3 - Übersicht
+	ftl2 := "111-0" // ORF 1, 2 and 3 - Schlagzeilen
+	ftl3 := "200-0" // ORF 1, 2 - Sport
+	ftl4 := "600-0" // ORF 1, 2 and 3 - Wetter
+	if strings.Contains(station, "iii") {
+		ftl2 = "300-0" // Fernsehen
+		ftl3 = "400-0" // Kultur
+	}
+	if strings.Contains(station, "sport") {
+		ftl2 = "200-0" // Sport
+		ftl3 = "300-0" // Fernsehen
+	}
+	var output []byte
+	output = append(output, []byte(fmt.Sprintf(
+		"%v%v%v%v%vftl=%v\nftl=%v\nftl=%v\nftl=%v\n<pre>", pp, np, ps, ns, ct, ftl1, ftl2, ftl3, ftl4))...)
+
+	row0 := make([]byte, 40)
+	for i := range row0 {
+		row0[i] = 0x20
+	}
+	dt := getORFDate()
+	stationPage := "\x07" + parts[0]
+	switch station {
+	case "orf1":
+		stationPage = stationPage + "\x06ORF1"
+	case "orf2":
+		stationPage = stationPage + "\x06ORF2"
+	case "orfiii":
+		stationPage = stationPage + "\x06ORF III"
+	case "sportplus":
+		stationPage = stationPage + "\x03ORF SPORT+\x07"
+	}
+	// first write date + time
+	copy(row0[19:], stringToLatin1Bytes(dt))
+	// then write pagenumber and station; the reason for this order is because of ORF SPORT+.
+	// This text overwrites the day name on purpose to mimick the header row on TV
+	copy(row0[7:], []byte(stationPage))
+
+	output = append(output, row0...)
+
+	for _, r := range rows[1:] {
+		output = append(output, r...)
+	}
+
+	output = append(output, []byte("</pre>")...)
+	os.WriteFile(filepath.Join(dirStation, pageNr), output, 0644)
+}
+
+func getORFDate() string {
+	now := time.Now()
+	days := map[string]string{"Sun": "So", "Mon": "Mo", "Tue": "Di", "Wed": "Mi", "Thu": "Do", "Fri": "Fr", "Sat": "Sa"}
+	yearStr := strconv.Itoa(now.Year())
+	return fmt.Sprintf("\x07%s %02d.%02d.%s %s", days[now.Format("Mon")], now.Day(), now.Month(), yearStr[2:], now.Format("15:04:05"))
+}
+
+var controlCodeMap = map[string]byte{
+	"Black":    TCC_ALPHA_BLACK,
+	"Red":      TCC_ALPHA_RED,
+	"Green":    TCC_ALPHA_GREEN,
+	"Yellow":   TCC_ALPHA_YELLOW,
+	"Blue":     TCC_ALPHA_BLUE,
+	"Magenta":  TCC_ALPHA_MAGENTA,
+	"Cyan":     TCC_ALPHA_CYAN,
+	"White":    TCC_ALPHA_WHITE,
+	"GBlack":   TCC_MOSAIC_BLACK,
+	"GRed":     TCC_MOSAIC_RED,
+	"GGreen":   TCC_MOSAIC_GREEN,
+	"GYellow":  TCC_MOSAIC_YELLOW,
+	"GBlue":    TCC_MOSAIC_BLUE,
+	"GMagenta": TCC_MOSAIC_MAGENTA,
+	"GCyan":    TCC_MOSAIC_CYAN,
+	"GWhite":   TCC_MOSAIC_WHITE,
+	"BB":       TCC_BLACK_BACKGROUND,
+	"NB":       TCC_NEW_BACKGROUND,
+	"Hold":     TCC_HOLD_MOSAICS,
+	"Release":  TCC_RELEASE_MOSAICS,
+	"DH":       TCC_DOUBLE_HEIGHT,
+}
+
+// Extract page or subpage index from url: "/channel/orf1/page/652/1.html" -> returns (652, 1)
+func extractPageInfoFromURL(href string) (int, int) {
+	parts := strings.Split(href, "/")
+	if len(parts) >= 6 {
+		p, _ := strconv.Atoi(parts[4])
+		subStr := strings.TrimSuffix(parts[5], ".html")
+		s, _ := strconv.Atoi(subStr)
+		return p, s
+	}
+	return 0, 0
+}
+
+func parseORFRows(body io.Reader, station string, pageNr string) ([][]byte, NavignationInfo) {
+	var nav NavignationInfo
+
+	if pageNr == "100" {
+		nav.cycleTime = 6
+	}
+
+	// Initialize buffer with 25 rows, 40 spaces each
+	pageBuffer := make([][]byte, 25)
+	for i := range pageBuffer {
+		line := make([]byte, 40)
+		for j := range line {
+			line[j] = 0x20
+		}
+		pageBuffer[i] = line
+	}
+
+	z := html.NewTokenizer(body)
+	currentRow := 0 //-1
+	currentCol := 0
+	inTeletextBlock := false
+	skipTextToken := false
+
+	for {
+		tt := z.Next()
+		if tt == html.ErrorToken {
+			break
+		}
+
+		token := z.Token()
+
+		switch tt {
+		case html.TextToken:
+			if skipTextToken {
+				skipTextToken = false
+				continue
+			}
+			if currentRow < 0 || currentRow >= 25 {
+				continue
+			}
+			text := token.Data
+			for _, r := range text {
+				if currentCol >= 40 {
+					break
+				}
+				if r == '\u00a0' {
+					pageBuffer[currentRow][currentCol] = 0x20
+				} else {
+					pageBuffer[currentRow][currentCol] = zdfEncodeChar(r)
+				}
+				currentCol++
+			}
+
+		case html.StartTagToken, html.SelfClosingTagToken:
+			var classVal, dataLengthVal, dataCharcodeVal, dataInfo, dataPagenumber string
+			for _, attr := range token.Attr {
+				switch attr.Key {
+				case "class":
+					classVal = attr.Val
+				case "data-length":
+					dataLengthVal = attr.Val
+				case "data-charcode":
+					dataCharcodeVal = attr.Val
+				case "data-info":
+					dataInfo = attr.Val
+				case "data-pagenumber":
+					dataPagenumber = attr.Val
+				}
+			}
+
+			// 1. Navigation Parser Part
+			if token.Data == "div" && classVal == "menu" {
+				for {
+					innerTT := z.Next()
+					if innerTT == html.ErrorToken {
+						break
+					}
+					innerToken := z.Token()
+					if innerTT == html.EndTagToken && innerToken.Data == "div" {
+						break
+					}
+					if innerTT == html.StartTagToken && innerToken.Data == "a" {
+						var subClass, subHref string
+						for _, a := range innerToken.Attr {
+							if a.Key == "class" {
+								subClass = a.Val
+							} else if a.Key == "href" {
+								subHref = a.Val
+							}
+						}
+						p, s := extractPageInfoFromURL(subHref)
+						switch subClass {
+						case "pp":
+							nav.prevPage = p
+						case "ps":
+							nav.prevSubpage = s
+						case "ns":
+							nav.nextSubpage = s
+						case "np":
+							nav.nextPage = p
+						}
+					}
+				}
+				continue
+			}
+
+			// 2. Track entrance into teletext content region
+			if token.Data == "div" && classVal == "teletext" {
+				inTeletextBlock = true
+			}
+
+			if !inTeletextBlock {
+				continue
+			}
+
+			// Handle layout row steps inside Teletext
+			if token.Data == "div" && classVal == "line" {
+				currentRow++
+				currentCol = 0
+				continue
+			}
+
+			// Process individual data runs
+			if token.Data == "div" && classVal == "run" {
+				if currentRow < 0 || currentRow >= 25 {
+					continue
+				}
+
+				length := 1
+				if dataLengthVal != "" {
+					length, _ = strconv.Atoi(dataLengthVal)
+				}
+				if length <= 0 {
+					continue
+				}
+
+				if dataInfo != "" {
+					codeName := strings.Trim(dataInfo, "{}")
+					if strings.Contains(codeName, "PN") {
+						skipTextToken = true
+						continue
+					}
+					if codeByte, found := controlCodeMap[codeName]; found {
+						if currentCol < 40 {
+							pageBuffer[currentRow][currentCol] = codeByte
+							currentCol += length
+						}
+						skipTextToken = true
+						continue
+					}
+				}
+
+				// If hardcoded mosaic character code is present via hex pattern (e.g., "7Ch")
+				if dataCharcodeVal != "" {
+					hexStr := strings.TrimSuffix(dataCharcodeVal, "h")
+					if val, err := strconv.ParseUint(hexStr, 16, 8); err == nil {
+						if currentCol < 40 {
+							pageBuffer[currentRow][currentCol] = byte(val)
+							currentCol += length
+						}
+					}
+					skipTextToken = true
+					continue
+				}
+
+				if dataPagenumber != "" {
+					skipTextToken = true
+				}
+			}
+		}
+	}
+
+	// Static Footer Fastext generation defaults overrides
+	switch station {
+	case "orf1", "orf2":
+		copy(pageBuffer[24][0:], "\x01\xDCbersicht \x02Schlagzeilen \x03Sport \x06Wetter")
+	case "orfiii":
+		copy(pageBuffer[24][0:], "\x01\xDCbersicht\x02Fernsehen\x03Kultur+Show \x06Wetter")
+	case "sportplus":
+		copy(pageBuffer[24][0:], "\x01\xDCbersicht  \x02Sport   \x03Fernsehen  \x06Wetter")
+	}
+
+	return pageBuffer, nav
+}
+
 // --- SVT Text ---
 
 func svttextHandler(w http.ResponseWriter, r *http.Request) {
@@ -1661,14 +2013,6 @@ func svttextGetTeletexPage(pageNr string) {
 	nav.nextSubpage = nav.prevSubpage + 2
 	if nav.numberOfSubpages > 1 {
 		subPageIndicator = "(" + strconv.Itoa(nav.prevSubpage+1) + "/" + strconv.Itoa(nav.numberOfSubpages) + ")"
-		/*
-			if prevSubpage > 0 {
-				ps = "pn=ps" + currentPage + "-" + strconv.Itoa(prevSubpage) + "\n"
-			}
-			if nextSubpage <= numberOfSubpages {
-				ns = "pn=ns" + currentPage + "-" + strconv.Itoa(nextSubpage) + "\n"
-			}
-		*/
 		ps, ns, _ = getPrevNextSubpage(parts[0], nav)
 	}
 
@@ -2357,7 +2701,7 @@ func teefaxGetTeletexPage(pageNr string) {
 	parts := strings.Split(pageNr, "-")
 	url, err := getTeefaxURL(parts[0])
 	if err != nil {
-		fmt.Printf("Page %s: Error: %v\n", parts[0], err)
+		fmt.Printf("Page %s: Error: %v", parts[0], err)
 	}
 
 	if strings.HasPrefix(pageNr, "100") {
@@ -2409,6 +2753,8 @@ func getPrevNextSubpage(pageNr string, nav NavignationInfo) (string, string, str
 		}
 	}
 	if nav.cycleTime > 0 {
+		// Force cycle time to be at least 5 seconds. Below seems not very useful to me.
+		nav.cycleTime = max(5, nav.cycleTime)
 		cycletime = "ct=" + strconv.Itoa(nav.cycleTime) + "\n"
 	}
 	return prev, next, cycletime
@@ -2484,7 +2830,7 @@ func parseTTIRows(r io.Reader, pageStr string, subpageStr string, isCEEFAX bool)
 				// set default cycle time to 5 seconds; this value may be adjusted if the page has a CT command (see below)
 				// note: this value is deducted by looking at NMS Ceefax and time how long each subpage is shown
 				nav.cycleTime = 5
-				fmt.Printf("SC/Subpage Carousel indicator encountered:%v cycleTime set to:%v\n", subcode, nav.cycleTime)
+				//fmt.Printf("SC/Subpage Carousel indicator encountered:%v cycleTime set to:%v\n", subcode, nav.cycleTime)
 			}
 		}
 
@@ -2494,7 +2840,7 @@ func parseTTIRows(r io.Reader, pageStr string, subpageStr string, isCEEFAX bool)
 			cycletimeStr := string(parts[1])
 			cycletime, _ := strconv.Atoi(cycletimeStr)
 			nav.cycleTime = cycletime
-			fmt.Printf("CT; cycleTime set to:%v\n", nav.cycleTime)
+			//fmt.Printf("CT; cycleTime set to:%v\n", nav.cycleTime)
 			// 199: CT,2,C
 			// 528: CT,20,T
 			// 100: No CT indicator -> cycle time is the default value of 5s
@@ -2608,7 +2954,7 @@ var directoryData []byte
 var fetchedDirectoryListing bool = false
 
 func getTeefaxURL(pageID string) (string, error) {
-	// Fetch directory listing only at first use; after that we directoryData for reuse
+	// Fetch directory listing only at first use; after that we reuse directoryData
 	if !fetchedDirectoryListing {
 		resp, err := http.Get(baseURL)
 		if err != nil {
@@ -2665,6 +3011,7 @@ func tekstiHandler(w http.ResponseWriter, r *http.Request) {
 func tekstiGetTeletexPage(pageNr string) {
 	parts := strings.Split(pageNr, "-")
 	var rows [][]byte
+	var nav NavignationInfo
 
 	if tekstiAPIkey == "" {
 		// show the user a teletext page with instructions how to obtain an API key
@@ -2712,16 +3059,21 @@ func tekstiGetTeletexPage(pageNr string) {
 			parts[1] = "1"
 		}
 
-		rows, err = parseTEKSTIRows(resp.Body, parts[1]) // parts[1] = subpagenumber
+		rows, nav, err = parseTEKSTIRows(resp.Body, parts[1]) // parts[1] = subpagenumber
 		if err != nil {
 			fmt.Println("xml.Unmarshal error")
 			return
 		}
 	}
+	ps := ""
+	ns := ""
+	if nav.numberOfSubpages > 1 {
+		ps, ns, _ = getPrevNextSubpage(parts[0], nav)
+	}
 
 	var output []byte
 	output = append(output, []byte(fmt.Sprintf(
-		"pn=p_\npn=n_\nftl=%v-0\nftl=%v-0\nftl=%v-0\nftl=%v-0\n<pre>",
+		"%v%vftl=%v-0\nftl=%v-0\nftl=%v-0\nftl=%v-0\n<pre>", ps, ns,
 		"100", "200", "300", "400"))...)
 
 	headerRow := bytes.Repeat([]byte{0x20}, 40)
@@ -2737,7 +3089,7 @@ func tekstiGetTeletexPage(pageNr string) {
 	os.WriteFile(filepath.Join(DirTEKSTI, pageNr), output, 0644)
 }
 
-func parseTEKSTIRows(body io.ReadCloser, subpageStr string) ([][]byte, error) {
+func parseTEKSTIRows(body io.ReadCloser, subpageStr string) ([][]byte, NavignationInfo, error) {
 	defer body.Close()
 
 	// Initialize empty 24x40 grid with spaces (0x20)
@@ -2755,22 +3107,47 @@ func parseTEKSTIRows(body io.ReadCloser, subpageStr string) ([][]byte, error) {
 	// Track state during streaming
 	inTargetSubpage := false
 
+	var pageSubpageCount int
+	var nav NavignationInfo
+
 	for {
 		t, err := decoder.Token()
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
-			return nil, err
+			return nil, nav, err
 		}
 
 		switch se := t.(type) {
 		case xml.StartElement:
+			if se.Name.Local == "page" {
+				for _, attr := range se.Attr {
+					switch attr.Name.Local {
+					case "subpagecount":
+						fmt.Sscanf(attr.Value, "%d", &pageSubpageCount)
+						nav.numberOfSubpages = pageSubpageCount
+						//fmt.Printf("Page has %d subpages\n", pageSubpageCount)
+					case "number":
+						//fmt.Printf("Page number: %s\n", attr.Value)
+					}
+				}
+			}
+
 			if se.Name.Local == "subpage" {
 				// Check if this subpage matches the requested number
 				for _, attr := range se.Attr {
 					if attr.Name.Local == "number" && attr.Value == subpageStr {
 						inTargetSubpage = true
+						subpageInt, err := strconv.Atoi(subpageStr)
+						if err == nil {
+							if subpageInt > 1 {
+								nav.prevSubpage = subpageInt - 1
+							}
+							if subpageInt < nav.numberOfSubpages {
+								nav.nextSubpage = subpageInt + 1
+							}
+						}
 					}
 				}
 			}
@@ -2787,9 +3164,9 @@ func parseTEKSTIRows(body io.ReadCloser, subpageStr string) ([][]byte, error) {
 				if isAllType {
 					// We are inside the correct block, parse the lines
 					if err := decodeTekstiLinesIntoBuffer(decoder, pageBuffer); err != nil {
-						return nil, err
+						return nil, nav, err
 					}
-					return pageBuffer, nil // Found and processed the target
+					return pageBuffer, nav, nil // Found and processed the target
 				}
 			}
 
@@ -2799,7 +3176,7 @@ func parseTEKSTIRows(body io.ReadCloser, subpageStr string) ([][]byte, error) {
 			}
 		}
 	}
-	return pageBuffer, nil
+	return pageBuffer, nav, nil
 }
 
 // Helper to handle the internal line decoding
@@ -2919,21 +3296,37 @@ func drteksttvGetTeletexPage(pageNr string) {
 		return
 	}
 
-	// Note: the ftl - fastext links are fixed for now; it could be made dynamic in a future release
-	// Nyheder (110), Sport (200), TV (300) and Vejret (400)
-	// aka: nieuws, sport, TV, weather
-	var output []byte
-	output = append(output, []byte("ftl=110-0\nftl=200-0\nftl=300-0\nftl=400-0\n<pre>")...)
-
 	row0 := make([]byte, 40)
 	for i := range row0 {
 		row0[i] = 0x20
 	}
-	rows, err := parseDRRows(resp.Body, parts[0], parts[1])
+	var nav NavignationInfo
+	rows, nav, err := parseDRRows(resp.Body, parts[0], parts[1])
 	if err != nil {
 		fmt.Println(err.Error())
 		return
 	}
+
+	pp := ""
+	np := ""
+	ps := ""
+	ns := ""
+	if nav.numberOfSubpages > 1 {
+		ps, ns, _ = getPrevNextSubpage(parts[0], nav)
+	}
+	if nav.prevPage > 0 {
+		pp = "pn=p_" + strconv.Itoa(nav.prevPage) + "-1\n"
+	}
+	if nav.nextPage > 0 {
+		np = "pn=n_" + strconv.Itoa(nav.nextPage) + "-1\n"
+	}
+
+	// Note: the ftl - fastext links are fixed for now; it could be made dynamic in a future release
+	// Nyheder (110), Sport (200), TV (300) and Vejret (400)
+	// aka: nieuws, sport, TV, weather
+	var output []byte
+	output = append(output, []byte(fmt.Sprintf(
+		"%v%v%v%vftl=110-0\nftl=200-0\nftl=300-0\nftl=400-0\n<pre>", pp, np, ps, ns))...)
 
 	for _, r := range rows {
 		output = append(output, r...)
@@ -2943,8 +3336,10 @@ func drteksttvGetTeletexPage(pageNr string) {
 	os.WriteFile(filepath.Join(DirDR, pageNr), output, 0644)
 }
 
-func parseDRRows(body io.ReadCloser, pageNr string, subPageNr string) ([][]byte, error) {
+func parseDRRows(body io.ReadCloser, pageNr string, subPageNr string) ([][]byte, NavignationInfo, error) {
 	defer body.Close()
+
+	var nav NavignationInfo
 
 	// Initialize 25x40 grid with spaces
 	pageBuffer := make([][]byte, 25)
@@ -2954,14 +3349,17 @@ func parseDRRows(body io.ReadCloser, pageNr string, subPageNr string) ([][]byte,
 
 	rawData, err := io.ReadAll(body)
 	if err != nil {
-		return nil, err
+		return nil, nav, err
 	}
 
 	// In DR Tekst-TV every page between 100..899 always exists; we have to check this text; bail out if page is not available
 	// 'Denne side er desværre ikke tilgængelig'
 	if strings.Contains(string(rawData), "Denne side er") {
-		return nil, errors.New("page not available")
+		return nil, nav, errors.New("page not available")
 	}
+
+	currentPageInt, _ := strconv.Atoi(pageNr)
+	currentSubPageInt, _ := strconv.Atoi(subPageNr)
 
 	z := html.NewTokenizer(strings.NewReader(string(rawData)))
 
@@ -2970,6 +3368,9 @@ func parseDRRows(body io.ReadCloser, pageNr string, subPageNr string) ([][]byte,
 	dashDetected := false
 	currentRow := 0
 	currentCol := 0
+
+	currentMapName := ""
+	var subPages []int
 
 	for {
 		tt := z.Next()
@@ -2983,6 +3384,41 @@ func parseDRRows(body io.ReadCloser, pageNr string, subPageNr string) ([][]byte,
 		case html.StartTagToken:
 			if token.Data == "pre" {
 				inPre = true
+			} else if token.Data == "map" {
+				for _, attr := range token.Attr {
+					if attr.Key == "name" {
+						currentMapName = attr.Val
+					}
+				}
+			} else if token.Data == "area" {
+				var hrefVal string
+				for _, attr := range token.Attr {
+					if attr.Key == "href" {
+						hrefVal = attr.Val
+					}
+				}
+				if hrefVal != "" {
+					segments := strings.Split(strings.Trim(hrefVal, "/"), "/")
+					if currentMapName == "FPMap1" {
+						// FPMap1 handles subpages (e.g., "/cgi-bin/fttx1.exe/601/3")
+						if len(segments) >= 4 {
+							if subIdx, err := strconv.Atoi(segments[3]); err == nil {
+								subPages = append(subPages, subIdx)
+							}
+						}
+					} else if currentMapName == "FPMap0" {
+						// FPMap0 handles main pages (e.g., "/cgi-bin/fttx1.exe/600")
+						if len(segments) >= 3 {
+							if targetPage, err := strconv.Atoi(segments[2]); err == nil {
+								if targetPage < currentPageInt {
+									nav.prevPage = targetPage
+								} else if targetPage > currentPageInt {
+									nav.nextPage = targetPage
+								}
+							}
+						}
+					}
+				}
 			} else if token.Data == "a" && inPre {
 				if currentCol > 0 {
 					currentCol--
@@ -2998,6 +3434,8 @@ func parseDRRows(body io.ReadCloser, pageNr string, subPageNr string) ([][]byte,
 		case html.EndTagToken:
 			if token.Data == "pre" {
 				inPre = false
+			} else if token.Data == "map" {
+				currentMapName = ""
 			} else if token.Data == "a" && inPre {
 				writeToBuffer(pageBuffer, &currentRow, &currentCol, TCC_ALPHA_WHITE)
 				colorCodeWritten = true
@@ -3024,7 +3462,6 @@ func parseDRRows(body io.ReadCloser, pageNr string, subPageNr string) ([][]byte,
 						dashDetected = true
 						continue
 					}
-					// Teletext is traditionally 7-bit/ASCII based
 					if colorCodeWritten && r == ' ' {
 						colorCodeWritten = false
 						continue
@@ -3032,6 +3469,21 @@ func parseDRRows(body io.ReadCloser, pageNr string, subPageNr string) ([][]byte,
 					colorCodeWritten = false
 					writeToBuffer(pageBuffer, &currentRow, &currentCol, encodeSVTChar(r))
 				}
+			}
+		}
+	}
+
+	// Compute subpage fields based on collected subpages
+	if len(subPages) > 0 {
+		// The number of subpages equals the unique/total variants provided by the map links
+		// (Usually, Teletext lists the alternative subpages here)
+		nav.numberOfSubpages = len(subPages) + 1 // +1 includes the current active subpage itself
+
+		for _, sub := range subPages {
+			if sub < currentSubPageInt {
+				nav.prevSubpage = sub
+			} else if sub > currentSubPageInt {
+				nav.nextSubpage = sub
 			}
 		}
 	}
@@ -4767,7 +5219,7 @@ func parseDRRows(body io.ReadCloser, pageNr string, subPageNr string) ([][]byte,
 	copy(pageBuffer[24][24:], "\x03TV")
 	copy(pageBuffer[24][31:], "\x06Vejret")
 
-	return pageBuffer, nil
+	return pageBuffer, nav, nil
 }
 
 // Helper to ensure we don't write out of bounds
@@ -4795,8 +5247,9 @@ func sendErrorMsg(w http.ResponseWriter, code int, message string) {
 }
 
 func logPageRequest(station string, page string) {
-	now := time.Now()
-	fmt.Printf("%v [%v:%v] - ", now.Format("2006-01-02 15:04:05"), station, page)
+	//	now := time.Now()
+	//	fmt.Printf("%v [%v:%v] - ", now.Format("2006-01-02 15:04:05"), station, page)
+	fmt.Printf("| Request: %-12s %s | ", station, page)
 }
 
 func logFetchingPage(url string) {

@@ -1,8 +1,8 @@
 # Teletext 64 Ultimate
 
-Teletext program showing live pages from the internet for the Commodore 64 Ultimate and other Ultimate products that have networking capabilities like the Ultimate 64, Ultimate II+. The WiC64 is also supported. 
+Teletext program showing live pages from the internet for the Commodore 64 Ultimate and other Ultimate products that have networking capabilities like the Ultimate 64 and the Ultimate II+. The WiC64 is also supported. 
 
-The program also runs on an original stock C64/C128 in C64 mode with a WiC64 or Ultimate II+ cartridge.
+The program also runs on an original stock C64/C128 in C64 mode with a WiC64 or an Ultimate II+ cartridge.
 
 
 ### Currently supporting:
@@ -20,10 +20,12 @@ The program also runs on an original stock C64/C128 in C64 mode with a WiC64 or 
 |ZDF_neo |Germany |
 |3sat |Germany, Austria, Switzerland |
 |DR Tekst-TV |Denmark |
+|ORF 1 |Austria |
+|ORF 2 |Austria |
+|ORF III |Austria |
+|ORF Sport+ |Austria |
 
 My mission: add as many Teletext services as possible. So let me know if you have any wishes.
-
-Currently working on: ORF 1, ORF 2, ORF III and ORF Sport+
 
 ## Description
 100% teletext compliant by using proper teletext character sets including the special graphic (mosaic) characters and support for the most common diacrits / accent marks. It runs in hires bitmap mode to support all the required foreground/background color combinations. To make the look & feel even more authentic, it can be used with a super bright RGB palette; so no washed out default C64 colors.
@@ -39,8 +41,8 @@ Although the C64U has excellent networking capabilities, it unfortunately is res
 - Switch between the thin and bold fonts on the fly within the program
 - If a requested page is not available online, it will show an older previous saved version of the page, if available. Handy for archival purposes.
 - Set your favorite teletext station and start page with the config utility.
-- Double height text, blinking text, hidden/concealed text that can be revealed
-- Auto-rotating subpages.
+- Double height text, blinking text, hidden/concealed text that can be revealed.
+- Auto rotating subpages.
 
 ## Tools used for this project
 - Xcode, CC65, Visual Studio Code, CharPad 

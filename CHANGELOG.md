@@ -1,5 +1,23 @@
 # **Teletext64U** changelog
 
+## [1.8.0] - 2026-06-27
+
+### Added
+- ORF 1, ORF 2, ORF III and ORF Sport+ (Austria), including auto rotating subpage support.
+- Auto rotating subpage support for ARD (Germany), YLE Teksti-TV (Finland) and DR Tekst-TV (Denmark).
+
+### Fixed Teletext64U
+- Auto rotating pages is paused while typing a pagenumber.  
+- Auto rotating pages: STOP indicator in header row always visible after manually going up / down a subpage.
+- Adding ORF exposed a number of issues in the teletext engine. These have been fixed. 
+- Local language character $40 (YLE: É, ZDF/ORF: §) now maps to @.
+- Pressing fastext keys F1-F7 after a page not found (red pagenumber top left), no longer request page 000.
+
+### Fixed PetsciiProxy
+- ZDF: Fixed the weather map on pages 171 and 172: mosaics are now converted back to proper teletext spec (ETS 300 706) with seperated mosaics and hold mosaic control codes. This results in a map exactly like on TV. So no more black open gaps in the map.
+- ZDF: Fixed row 2 issue banner / section.
+
+
 ## [1.7.0] - 2026-06-16
 
 ### Added
