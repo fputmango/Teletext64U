@@ -1,5 +1,12 @@
 # **Teletext64U** changelog
 
+## [1.8.1] - 2026-06-30
+
+### Added
+- CONFIG program: Added the option to set the minimum cycle time (in seconds); 0 uses the default cycle time.
+- CONFIG program: Added descriptive help text for each configuration item.
+
+
 ## [1.8.0] - 2026-06-27
 
 ### Added
