@@ -4,6 +4,8 @@ Teletext program showing live pages from the internet for the Commodore 64 Ultim
 
 The program also runs on an original stock C64/C128 in C64 mode with a WiC64 or an Ultimate II+ cartridge.
 
+## Great news!
+Teletext 64 Ultimate has its own dedicated public server at petsciiproxy.nl, so you no longer need to run a local server.
 
 ### Currently supporting:
 
@@ -32,7 +34,7 @@ My mission: add as many Teletext services as possible. So let me know if you hav
 
 It uses the same internet feed as the mobile apps or websites. To make it feel even more like on TV, the header row is modified to show the actual date with a page number top left. Entering page numbers works like as on a remote. Just type 3 digits and the requested page will be fetched, if available. Browse through sub pages with the cursor up/down keys and the Home key brings you to your favourite page. It also supports fastext, those four colored words you see at the bottom row. These are mapped to the C64U’s functions keys. The latest addition is carousel mode: subpages auto-rotate after a given number of seconds like on TV. 
 
-Although the C64U has excellent networking capabilities, it unfortunately is restricted to HTTP. That does not bring us very far with basically every site running secure HTTPS these days. So I wrote a PetsciiProxy program for PC/Mac/Linux/.. that handles the secure HTTPS connections. 
+Although the C64U has excellent networking capabilities, it unfortunately is restricted to HTTP. That does not bring us very far with basically every site running secure HTTPS these days. So I wrote a PetsciiProxy program for PC/Mac/Linux/.. that handles the secure HTTPS connections.
 
 ## Feature list
 - Auto 60 second refresh - always have the latest news on you screen, handy if you have your C64U hooked up to a separate screen; refresh time can be adjusted to your liking
@@ -42,7 +44,7 @@ Although the C64U has excellent networking capabilities, it unfortunately is res
 - If a requested page is not available online, it will show an older previous saved version of the page, if available. Handy for archival purposes.
 - Set your favorite teletext station and start page with the config utility.
 - Double height text, blinking text, hidden/concealed text that can be revealed.
-- Auto rotating subpages.
+- Auto rotating subpages with a configurable cycle time.
 
 ## Tools used for this project
 - Xcode, CC65, Visual Studio Code, CharPad 

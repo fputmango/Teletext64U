@@ -1,5 +1,22 @@
 # **Teletext64U** changelog
 
+## [2.0.0] - 2026-07-04
+
+### New!
+- Teletext64 now has its own dedicated, super-fast PetsciiProxy server at petsciiproxy.nl! No local proxy installation required.
+
+### Changed Teletext64U
+- WiC64 edition: This is a PRG-only version that always connects to petsciiproxy.nl. The CONFIG program and the UT64.CFG file have been removed from the D64 image and are no longer required. User settings are stored on the PetsciiProxy server.
+- Ultimate edition: This version still includes the complete D64 image and stores user settings locally. The CONFIG program now includes a new option that lets users choose between the petsciiproxy.nl server and a locally running PetsciiProxy instance by entering its IP address and port.
+
+### Changed PetsciiProxy
+- DR Tekst-TV: applied cyan header/highlights on page 202
+
+### Notes on the petsciiproxy.nl server
+- Time zone on the server set to Europe/Amsterdam (CEST, +0200).
+- YLE Teksti-TV is not supported yet, because of the personal API key. I'll have to implement a solution for this.
+
+
 ## [1.8.1] - 2026-06-30
 
 ### Added

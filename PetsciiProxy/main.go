@@ -25,7 +25,6 @@ Supported teletext services:
 - ORF 1, ORF 2, ORF III, ORF Sport+ (Austria)
 
 Next up candidates:
-- ORF (Austria) - https://text.orf.at/channel/orf1/page/100/1.html
 - RTP teletexto (Portugal) - https://www.rtp.pt/wportal/fab-txt/texto/100/100_0001.htm
 - HR-text (German) https://www.hr-text.hr-fernsehen.de/ttxweb/?page=100
 - ...?
@@ -86,7 +85,7 @@ import (
 )
 
 // Version
-const pp_version = "1.8.0"
+const pp_version = "2.0.0"
 
 // Supported teletext services
 const (
@@ -105,6 +104,7 @@ const (
 	DirTEKSTI   = "TEKSTI-TV"
 	DirSVT      = "SVT-TEXT"
 	DirDR       = "DR-TEKST-TV"
+	DirUD       = "UD"
 )
 
 // Each service has its own handler
@@ -318,7 +318,7 @@ func ipLoggingMiddleware(next http.Handler) http.Handler {
 		clientIP := getClientIP(r)
 		// Log the IP along with the request method and path
 		//		fmt.Printf("%v [CONN] Client IP: %-15s | Request: %s %s", now.Format("2006-01-02 15:04:05"), clientIP, r.Method, r.URL.Path)
-		fmt.Printf("%v Client IP: %-15s", now.Format("2006-01-02 15:04:05"), clientIP)
+		fmt.Printf("%v Client IP: %-15s\n", now.Format("2006-01-02 15:04:05"), clientIP)
 		// Pass the request along to the actual handler
 		next.ServeHTTP(w, r)
 	})
@@ -365,6 +365,14 @@ If you do not have one, you can request one here: https://developer.yle.fi/en/in
 		mux.HandleFunc(fmt.Sprintf("/%s/{id}", name), handler)
 	}
 
+	// Create UD folder for user config storage and register handler
+	// WiC64 firmware v2.1.0 uppercases the URL path, so register both cases
+	err = os.MkdirAll(DirUD, 0755)
+	if err != nil {
+		fmt.Printf("Could not create folder %s: %v\n", DirUD, err)
+	}
+	mux.HandleFunc("/UD/", udHandler)
+	mux.HandleFunc("/ud/", udHandler)
 	fmt.Printf("Teletext PetsciiProxy server v%v, serving on port %d\n", pp_version, port)
 
 	address := fmt.Sprintf(":%d", port)
@@ -676,8 +684,16 @@ func parseARDRows(r io.Reader, correctFirstRows bool) [][]byte {
 
 	parseEntity := func() {
 		start := i
-		for i < len(data) && data[i] != ';' {
+		//for i < len(data) && data[i] != ';' && data[i] != '<' && data[i] != '>' && (i-start) < 8 {
+		for i < len(data) && data[i] != ';' && data[i] != '<' && data[i] != '>' && data[i] != '&' && (i-start) < 8 {
 			i++
+		}
+
+		if i >= len(data) || data[i] != ';' {
+			// Not a valid entity — treat '&' as a literal ampersand
+			i = start
+			writeChar('&')
+			return
 		}
 
 		entityName := string(data[start:i])
@@ -688,9 +704,11 @@ func parseARDRows(r io.Reader, correctFirstRows bool) [][]byte {
 				if skipNextSpace && !(col == 1) {
 					skipNextSpace = false
 				} else {
+					skipNextSpace = false
 					writeChar(b)
 				}
 			} else {
+				skipNextSpace = false
 				writeChar(b)
 			}
 		}
@@ -734,6 +752,7 @@ func parseARDRows(r io.Reader, correctFirstRows bool) [][]byte {
 		fmt.Sscanf(m[1], "%x", &v)
 		mosaic := byte(v + 0x80)
 		writeChar(mosaic)
+		skipNextSpace = false
 		// correct color control code offset if needed
 		if colorPos != 0xFF {
 			row[colorPos] += 0x10
@@ -4064,8 +4083,31 @@ func parseDRRows(body io.ReadCloser, pageNr string, subPageNr string) ([][]byte,
 		}
 	}
 
+	// Fodbold/Ovrige Resultater/Stillinger
 	if pageNum == 202 {
 		drawSportHeader(1)
+		for row := 3; row < 23; row++ {
+			rowStr := string(pageBuffer[row])
+			startColumn := strings.Index(rowStr, "Nations")
+			if startColumn > 0 {
+				pageBuffer[row][startColumn-1] = TCC_ALPHA_CYAN
+			}
+			startColumn = strings.Index(rowStr, "VM ")
+			if startColumn > 0 {
+				pageBuffer[row][startColumn-1] = TCC_ALPHA_CYAN
+			}
+			startColumn = strings.Index(rowStr, "Livekampe")
+			if startColumn > 0 {
+				pageBuffer[row][startColumn-1] = TCC_ALPHA_CYAN
+			}
+			if pageBuffer[row][3] == 0x20 && pageBuffer[row][5] != 0x20 && pageBuffer[row-1][5] == 0x20 {
+				pageBuffer[row][4] = TCC_ALPHA_CYAN
+				pageBuffer[row][19] = TCC_ALPHA_WHITE
+			}
+			if pageBuffer[row][23] == 0x20 && pageBuffer[row][25] != 0x20 {
+				pageBuffer[row][24] = TCC_ALPHA_CYAN
+			}
+		}
 		pageBuffer[23][1] = TCC_NEW_BACKGROUND
 		pageBuffer[23][2] = TCC_ALPHA_BLACK
 		pos := strings.Index(string(pageBuffer[23]), ">")
@@ -5240,6 +5282,113 @@ func handleStaticFile(w http.ResponseWriter, filename string) {
 	w.Write(data)
 }
 
+// --- User Config (UD)
+//
+// Stores per-user config as a 7-byte binary file in the UD/ folder, keyed by MAC address.
+//
+// Endpoints (firmware sends uppercase; server accepts both):
+//   GET /ud/{mac}/r           → check: \x00 if config exists, \x01 if not
+//   GET /ud/{mac}/l           → load:  \x00\x07<7 bytes> on success, \x01 if not found
+//   GET /ud/{mac}/s/{hexdata} → save:  \x00 on success, \x01 on error
+//
+// Config layout (7 bytes, little-endian):
+//   [0-1] refreshtime  [2-3] cycletime  [4] station  [5-6] startpage
+
+func udHandler(w http.ResponseWriter, r *http.Request) {
+	// Normalise to lowercase (firmware uppercases the entire path)
+	parts := strings.Split(strings.ToLower(strings.Trim(r.URL.Path, "/")), "/")
+	// Expected: ud / mac / cmd  (and optionally ud / mac / s / hexdata)
+	if len(parts) < 3 {
+		http.Error(w, "Bad request", 400)
+		return
+	}
+
+	mac := parts[1]
+	cmd := parts[2]
+
+	// Validate MAC: exactly 12 lowercase hex characters
+	if len(mac) != 12 {
+		http.Error(w, "Invalid MAC", 400)
+		return
+	}
+	for _, c := range mac {
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+			http.Error(w, "Invalid MAC", 400)
+			return
+		}
+	}
+
+	cfgPath := filepath.Join(DirUD, mac+".cfg")
+
+	writeBinaryResponse := func(data []byte) {
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.WriteHeader(200)
+		w.Write(data)
+	}
+
+	switch cmd {
+
+	case "r": // Check — does a config exist for this MAC?
+		fmt.Printf("Request: %-12s %s/r | ", DirUD, mac)
+		if _, err := os.Stat(cfgPath); err == nil {
+			fmt.Println("found")
+			writeBinaryResponse([]byte{0x00})
+		} else {
+			fmt.Println("not found")
+			writeBinaryResponse([]byte{0x01})
+		}
+
+	case "l": // Load — return the 7 config bytes
+		fmt.Printf("Request: %-12s %s/l | ", DirUD, mac)
+		data, err := os.ReadFile(cfgPath)
+		if err != nil || len(data) != 7 {
+			fmt.Println("not found")
+			writeBinaryResponse([]byte{0x01})
+			return
+		}
+		fmt.Println("loaded")
+		resp := make([]byte, 9) // status(1) + length(1) + data(7)
+		resp[0] = 0x00
+		resp[1] = 7
+		copy(resp[2:], data)
+		writeBinaryResponse(resp)
+
+	case "s": // Save — hex data is the next path segment
+		fmt.Printf("Request: %-12s %s/s | ", DirUD, mac)
+		if len(parts) < 4 {
+			fmt.Println("missing hex data")
+			writeBinaryResponse([]byte{0x01})
+			return
+		}
+		hexdata := parts[3]
+		if len(hexdata) != 14 { // 7 bytes × 2 hex digits
+			fmt.Printf("invalid hex length: %d\n", len(hexdata))
+			writeBinaryResponse([]byte{0x01})
+			return
+		}
+		data := make([]byte, 7)
+		for i := 0; i < 7; i++ {
+			v, err := strconv.ParseUint(hexdata[i*2:i*2+2], 16, 8)
+			if err != nil {
+				fmt.Println("hex decode error:", err)
+				writeBinaryResponse([]byte{0x01})
+				return
+			}
+			data[i] = byte(v)
+		}
+		if err := os.WriteFile(cfgPath, data, 0644); err != nil {
+			fmt.Println("write error:", err)
+			writeBinaryResponse([]byte{0x01})
+			return
+		}
+		fmt.Println("saved")
+		writeBinaryResponse([]byte{0x00})
+
+	default:
+		http.Error(w, "Unknown command", 400)
+	}
+}
+
 func sendErrorMsg(w http.ResponseWriter, code int, message string) {
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(code)
@@ -5249,7 +5398,7 @@ func sendErrorMsg(w http.ResponseWriter, code int, message string) {
 func logPageRequest(station string, page string) {
 	//	now := time.Now()
 	//	fmt.Printf("%v [%v:%v] - ", now.Format("2006-01-02 15:04:05"), station, page)
-	fmt.Printf("| Request: %-12s %s | ", station, page)
+	fmt.Printf("Request: %-12s %s | ", station, page)
 }
 
 func logFetchingPage(url string) {
