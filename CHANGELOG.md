@@ -1,5 +1,15 @@
 # **Teletext64U** changelog
 
+## [2.0.1] - 2026-07-07
+
+### New!
+- Teletext64 is now hosted on the WiC portal under 'Apps'.
+
+### Fixed
+- The WiC64 edition now also runs within VICE emulating the WiC64.
+- ZDF parser improved, thanks to feedback from a user on Forum64. 
+
+
 ## [2.0.0] - 2026-07-04
 
 ### New!

@@ -85,7 +85,7 @@ import (
 )
 
 // Version
-const pp_version = "2.0.0"
+const pp_version = "2.0.1"
 
 // Supported teletext services
 const (
@@ -223,6 +223,8 @@ var controlMap = map[string]byte{
 	"Hold":     TCC_HOLD_MOSAICS,
 	"NH":       TCC_NORMAL_HEIGHT,
 	"DH":       TCC_DOUBLE_HEIGHT,
+	"DW":       TCC_DOUBLE_WIDTH,
+	"DS":       TCC_DOUBLE_SIZE,
 	"BB":       TCC_BLACK_BACKGROUND,
 	"Conceal":  TCC_CONCEAL,
 	"SB":       TCC_STARTBOX,
@@ -1234,6 +1236,8 @@ func parseZDFRows(body io.ReadCloser, zdfStation string, pageNr string) ([][]byt
 	// writes a 0x20 space and pushes all row content 20+ columns to the right.
 	skipNbsp := false
 	spaceCounter := 0
+	//new
+	bgTransitionCol := -1
 
 	resetRowState := func() {
 		currentCol = 0
@@ -1242,6 +1246,8 @@ func parseZDFRows(body io.ReadCloser, zdfStation string, pageNr string) ([][]byt
 		isMosaic = false
 		skipNbsp = false
 		spaceCounter = 0
+		// new
+		bgTransitionCol = -1
 	}
 
 	writeAt := func(pos int, b byte) {
@@ -1346,13 +1352,16 @@ func parseZDFRows(body io.ReadCloser, zdfStation string, pageNr string) ([][]byt
 						prevFgCode = fgCode
 						prevBgCode = bgCode
 						skipNbsp = true
+						// new
+						bgTransitionCol = currentCol - 1
 					}
 					continue
 				}
 
 				// New foreground colour?
 				if fgHex != "" && fgCode != prevFgCode {
-					if currentCol > 0 && (fgCode != TCC_ALPHA_BLACK || bgHex != "") {
+					// newif currentCol > 0 && (fgCode != TCC_ALPHA_BLACK || bgHex != "") {
+					if currentCol > 0 && (fgCode != TCC_ALPHA_BLACK || bgHex != "") && currentCol-1 != bgTransitionCol {
 						writeAt(currentCol-1, fgCode)
 					}
 					prevFgCode = fgCode
@@ -1371,6 +1380,8 @@ func parseZDFRows(body io.ReadCloser, zdfStation string, pageNr string) ([][]byt
 					prevBgCode = bgCode
 					prevFgCode = bgCode
 					skipNbsp = true
+					// new
+					bgTransitionCol = currentCol - 1
 				}
 			}
 
@@ -1379,9 +1390,10 @@ func parseZDFRows(body io.ReadCloser, zdfStation string, pageNr string) ([][]byt
 				continue
 			}
 			text := token.Data
-			for _, r := range text {
+
+			writeZdfRune := func(r rune) {
 				if currentCol >= 40 {
-					break
+					return
 				}
 				switch {
 				case r == '\u00a0': // is a &nbsp;
@@ -1409,6 +1421,26 @@ func parseZDFRows(body io.ReadCloser, zdfStation string, pageNr string) ([][]byt
 						writeCurrent(b)
 					}
 				}
+			}
+
+			// 3sat testpage 898 embed teletext control codes as {TAG} placeholders instead of real formatting
+			// like {DW}/{DH}/{NH} convention used for YLE Teksti-TV
+			if tagRegex.MatchString(text) {
+				last := 0
+				for _, m := range tagRegex.FindAllStringSubmatchIndex(text, -1) {
+					for _, r := range text[last:m[0]] {
+						writeZdfRune(r)
+					}
+					tagName := text[m[2]:m[3]]
+					if code, ok := controlMap[tagName]; ok {
+						writeCurrent(code)
+					}
+					last = m[1]
+				}
+				text = text[last:]
+			}
+			for _, r := range text {
+				writeZdfRune(r)
 			}
 		}
 	}
