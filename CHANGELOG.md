@@ -1,8 +1,15 @@
 # **Teletext64U** changelog
 
+## [2.0.2] - 2026-07-09
+
+### Changed Teletext64U
+- WiC edition: backarrow key Loads and runs the WiC64 portal program. Implemented using https://github.com/WiC64-Team/wic64-library#wic64_enter_portal
+- Uparrow key now steps back through previously visited pages (the key right to the *-key).
+- Updated the help screen.
+
 ## [2.0.1] - 2026-07-07
 
-### New!
+### News
 - Teletext64 is now hosted on the WiC portal under 'Apps'.
 
 ### Fixed
