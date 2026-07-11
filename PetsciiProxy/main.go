@@ -23,6 +23,8 @@ Supported teletext services:
 - 3SAT (German)
 - DR Tekst-TV (Danish teletext)
 - ORF 1, ORF 2, ORF III, ORF Sport+ (Austria)
+- Chunkytext (UK)
+- Webfax 1 & Webfax 1 (UK)
 
 Next up candidates:
 - RTP teletexto (Portugal) - https://www.rtp.pt/wportal/fab-txt/texto/100/100_0001.htm
@@ -76,55 +78,69 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 
 	"net/http/cookiejar"
 
+	"github.com/go-git/go-git/v5"
 	"golang.org/x/net/html"
 )
 
 // Version
-const pp_version = "2.0.1"
+const pp_version = "2.1.0"
 
 // Supported teletext services
 const (
-	DirNOS      = "NOS-TT"
-	DirARD      = "ARD-TEXT"
-	DirZDF      = "ZDF-TEXT"
-	DirZDFinfo  = "ZDFINFO"
-	DirZDFneo   = "ZDFNEO"
-	Dir3sat     = "3SAT"
-	DirORF1     = "ORF1"
-	DirORF2     = "ORF2"
-	DirORF3     = "ORF3"
-	DirORFSport = "ORFSPORT"
-	DirCEEFAX   = "CEEFAX"
-	DirTEEFAX   = "TEEFAX"
-	DirTEKSTI   = "TEKSTI-TV"
-	DirSVT      = "SVT-TEXT"
-	DirDR       = "DR-TEKST-TV"
-	DirUD       = "UD"
+	DirNOS        = "NOS-TT"
+	DirARD        = "ARD-TEXT"
+	DirZDF        = "ZDF-TEXT"
+	DirZDFinfo    = "ZDFINFO"
+	DirZDFneo     = "ZDFNEO"
+	Dir3sat       = "3SAT"
+	DirORF1       = "ORF1"
+	DirORF2       = "ORF2"
+	DirORF3       = "ORF3"
+	DirORFSport   = "ORFSPORT"
+	DirCEEFAX     = "CEEFAX"
+	DirTEEFAX     = "TEEFAX"
+	DirTEKSTI     = "TEKSTI-TV"
+	DirSVT        = "SVT-TEXT"
+	DirDR         = "DR-TEKST-TV"
+	DirCHUNKYTEXT = "CHUNKYTEXT"
+	DirWEBFAX1    = "WEBFAX1"
+	DirWEBFAX2    = "WEBFAX2"
+	DirUD         = "UD"
 )
+
+// Chunkeytext
+const chunkytextRepoURL = "https://zxnet.co.uk/git/cf.git"
+const chunkytextSyncInterval = 15 * time.Minute
 
 // Each service has its own handler
 var handlers = map[string]http.HandlerFunc{
-	DirNOS:      nosttHandler,
-	DirARD:      ardtextHandler,
-	DirZDF:      zdftextHandler,
-	DirZDFinfo:  zdfinfoHandler,
-	DirZDFneo:   zdfneoHandler,
-	Dir3sat:     zdf3satHandler,
-	DirORF1:     orf1Handler,
-	DirORF2:     orf2Handler,
-	DirORF3:     orf3Handler,
-	DirORFSport: orfSportHandler,
-	DirCEEFAX:   ceefaxHandler,
-	DirTEEFAX:   teefaxHandler,
-	DirTEKSTI:   tekstiHandler,
-	DirSVT:      svttextHandler,
-	DirDR:       drteksttvHandler,
+	DirNOS:        nosttHandler,
+	DirARD:        ardtextHandler,
+	DirZDF:        zdftextHandler,
+	DirZDFinfo:    zdfinfoHandler,
+	DirZDFneo:     zdfneoHandler,
+	Dir3sat:       zdf3satHandler,
+	DirORF1:       orf1Handler,
+	DirORF2:       orf2Handler,
+	DirORF3:       orf3Handler,
+	DirORFSport:   orfSportHandler,
+	DirCEEFAX:     ceefaxHandler,
+	DirTEEFAX:     teefaxHandler,
+	DirCHUNKYTEXT: chunkytextHandler,
+	DirWEBFAX1:    webfax1Handler,
+	DirWEBFAX2:    webfax2Handler,
+	DirTEKSTI:     tekstiHandler,
+	DirSVT:        svttextHandler,
+	DirDR:         drteksttvHandler,
 }
+
+var chunkytextMutex sync.RWMutex
 
 // Teletext control codes (range 0x00..0x1F); Alpha is a regular character; a mosaic is a graphics character
 // Note: not every value is used yet in this program; I just added all to be complete here
@@ -375,6 +391,16 @@ If you do not have one, you can request one here: https://developer.yle.fi/en/in
 	}
 	mux.HandleFunc("/UD/", udHandler)
 	mux.HandleFunc("/ud/", udHandler)
+
+	syncChunkytextRepo()
+	go func() {
+		ticker := time.NewTicker(chunkytextSyncInterval)
+		defer ticker.Stop()
+		for range ticker.C {
+			syncChunkytextRepo()
+		}
+	}()
+
 	fmt.Printf("Teletext PetsciiProxy server v%v, serving on port %d\n", pp_version, port)
 
 	address := fmt.Sprintf(":%d", port)
@@ -2714,11 +2740,95 @@ func teefaxHandler(w http.ResponseWriter, r *http.Request) {
 	writeResponse(w, DirTEEFAX, pageName)
 }
 
+// --- Webfax1 ---
+
+func webfax1Handler(w http.ResponseWriter, r *http.Request) {
+	pageName := getPageName(r, DirWEBFAX1)
+	webfax1GetTeletexPage(pageName)
+	writeResponse(w, DirWEBFAX1, pageName)
+}
+
+// --- Webfax1 ---
+
+func webfax2Handler(w http.ResponseWriter, r *http.Request) {
+	pageName := getPageName(r, DirWEBFAX2)
+	webfax2GetTeletexPage(pageName)
+	writeResponse(w, DirWEBFAX2, pageName)
+}
+
+// --- ChunkyText (git-mirrored teletext service) ---
+
+func chunkytextHandler(w http.ResponseWriter, r *http.Request) {
+	pageName := getPageName(r, DirCHUNKYTEXT)
+	chunkytextGetTeletexPage(pageName)
+	writeResponse(w, DirCHUNKYTEXT, pageName)
+}
+
+func chunkytextGetTeletexPage(pageNr string) {
+	parts := strings.Split(pageNr, "-")
+
+	chunkytextMutex.RLock()
+	filePath := filepath.Join(DirCHUNKYTEXT, "P"+parts[0]+".tti")
+	f, err := os.Open(filePath)
+	logFetchingPage(filePath)
+	chunkytextMutex.RUnlock()
+	if err != nil {
+		fmt.Println("ChunkyText page not found:", pageNr, err)
+		return
+	}
+	defer f.Close()
+
+	rows, nav := parseTTIRows(f, parts[0], parts[1], true)
+	ps, ns, ct := getPrevNextSubpage(parts[0], nav)
+
+	var output []byte
+	output = append(output, []byte(fmt.Sprintf(
+		"pn=p_\npn=n_\n%v%v%vftl=%v-0\nftl=%v-0\nftl=%v-0\nftl=%v-0\n<pre>",
+		ps, ns, ct,
+		string(ftl[0]), string(ftl[1]), string(ftl[2]), string(ftl[3])))...)
+
+	for _, row := range rows {
+		output = append(output, row...)
+	}
+
+	output = append(output, []byte("</pre>")...)
+	os.WriteFile(filepath.Join(DirCHUNKYTEXT, pageNr), output, 0644)
+}
+
+func syncChunkytextRepo() {
+	chunkytextMutex.Lock()
+	defer chunkytextMutex.Unlock()
+
+	repo, err := git.PlainOpen(DirCHUNKYTEXT)
+	if err != nil {
+		fmt.Println("ChunkyText: cloning repository...")
+		_, cloneErr := git.PlainClone(DirCHUNKYTEXT, false, &git.CloneOptions{
+			URL: chunkytextRepoURL,
+		})
+		if cloneErr != nil {
+			fmt.Println("ChunkyText clone error:", cloneErr)
+		}
+		return
+	}
+
+	w, err := repo.Worktree()
+	if err != nil {
+		fmt.Println("ChunkyText worktree error:", err)
+		return
+	}
+	err = w.Pull(&git.PullOptions{RemoteName: "origin"})
+	if err != nil && err != git.NoErrAlreadyUpToDate {
+		fmt.Println("ChunkyText pull error:", err)
+	}
+}
+
 var ftl [][]byte // gets filled by parseTTIRows
 
 func ceefaxGetTeletexPage(pageNr string) {
 	parts := strings.Split(pageNr, "-")
 	url := fmt.Sprintf("https://feeds.nmsni.co.uk/svn/ceefax/Worldwide/P%s.tti", parts[0])
+	//url := fmt.Sprintf("https://github.com/Webfax-Teletext/Webfax-Teletext/raw/refs/heads/main/P%s.tti", parts[0])
+	//url := fmt.Sprintf("https://github.com/Webfax-Teletext/Webfax2-Teletext/raw/refs/heads/main/P%s.tti", parts[0])
 	logFetchingPage(url)
 	resp, err := http.Get(url)
 	if err != nil {
@@ -2787,6 +2897,70 @@ func teefaxGetTeletexPage(pageNr string) {
 
 	output = append(output, []byte("</pre>")...)
 	os.WriteFile(filepath.Join(DirTEEFAX, pageNr), output, 0644)
+}
+
+func webfax1GetTeletexPage(pageNr string) {
+	parts := strings.Split(pageNr, "-")
+	url := fmt.Sprintf("https://github.com/Webfax-Teletext/Webfax-Teletext/raw/refs/heads/main/P%s.tti", parts[0])
+	logFetchingPage(url)
+	resp, err := http.Get(url)
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		fmt.Println("HTTP Error: Could not retrieve page", pageNr, "Status:", resp.StatusCode)
+		return
+	}
+
+	rows, nav := parseTTIRows(resp.Body, parts[0], parts[1], true) // parts[1] = subpagenumber
+	ps, ns, ct := getPrevNextSubpage(parts[0], nav)
+
+	var output []byte
+	output = append(output, []byte(fmt.Sprintf(
+		"pn=p_\npn=n_\n%v%v%vftl=%v-0\nftl=%v-0\nftl=%v-0\nftl=%v-0\n<pre>",
+		ps, ns, ct,
+		string(ftl[0]), string(ftl[1]), string(ftl[2]), string(ftl[3])))...)
+
+	for _, r := range rows {
+		output = append(output, r...)
+	}
+
+	output = append(output, []byte("</pre>")...)
+	os.WriteFile(filepath.Join(DirWEBFAX1, pageNr), output, 0644)
+}
+
+func webfax2GetTeletexPage(pageNr string) {
+	parts := strings.Split(pageNr, "-")
+	url := fmt.Sprintf("https://github.com/Webfax-Teletext/Webfax2-Teletext/raw/refs/heads/main/P%s.tti", parts[0])
+	logFetchingPage(url)
+	resp, err := http.Get(url)
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		fmt.Println("HTTP Error: Could not retrieve page", pageNr, "Status:", resp.StatusCode)
+		return
+	}
+
+	rows, nav := parseTTIRows(resp.Body, parts[0], parts[1], true) // parts[1] = subpagenumber
+	ps, ns, ct := getPrevNextSubpage(parts[0], nav)
+
+	var output []byte
+	output = append(output, []byte(fmt.Sprintf(
+		"pn=p_\npn=n_\n%v%v%vftl=%v-0\nftl=%v-0\nftl=%v-0\nftl=%v-0\n<pre>",
+		ps, ns, ct,
+		string(ftl[0]), string(ftl[1]), string(ftl[2]), string(ftl[3])))...)
+
+	for _, r := range rows {
+		output = append(output, r...)
+	}
+
+	output = append(output, []byte("</pre>")...)
+	os.WriteFile(filepath.Join(DirWEBFAX2, pageNr), output, 0644)
 }
 
 // currently used by ceefax, teefax, zdf, svt
@@ -2902,7 +3076,13 @@ func parseTTIRows(r io.Reader, pageStr string, subpageStr string, isCEEFAX bool)
 			numberStr := string(parts[1])
 			lineNumber, _ := strconv.Atoi(numberStr)
 			if lineNumber > 24 {
-				break
+				// changed from break to continue because I stumbled across a TTI page that started
+				// with 2 "OL, 26" rows and then the regular OL,1 OL,2...OL,24
+				// source page: Chunkytext page 131 about Discord
+				// the 'weird' OL,26 rows here below, any clue what this is? I could dig into it..
+				// OL,26,@idPa@NjdPaCNa`CaAPbA_bMfcA~cmfdavdMgeAP
+				// OL,26,AkdPa`CaCNaAPbasbmgcaQcMhda]dmheAPldPa@N
+				continue //break;
 			}
 
 			col := 0

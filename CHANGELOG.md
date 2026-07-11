@@ -1,11 +1,19 @@
 # **Teletext64U** changelog
 
+## [2.1.0] - 2026-07-11
+
+### Added
+- Chunkytext, Webfax 1, Webfax 2 (UK)
+- Added support for weird pagenumbers (like 10A) on Chunkytext. This means you can play Fun and Games on page 150! Note: I am aware that Teefax also uses weird pagenumbers; I have to look into that.
+
+
 ## [2.0.2] - 2026-07-09
 
 ### Changed Teletext64U
 - WiC edition: backarrow key Loads and runs the WiC64 portal program. Implemented using https://github.com/WiC64-Team/wic64-library#wic64_enter_portal
 - Uparrow key now steps back through previously visited pages (the key right to the *-key).
 - Updated the help screen.
+
 
 ## [2.0.1] - 2026-07-07
 

@@ -26,6 +26,9 @@ Teletext 64 Ultimate has its own dedicated public server at petsciiproxy.nl, so 
 |ORF 2 |Austria |
 |ORF III |Austria |
 |ORF Sport+ |Austria |
+|Chunkytext |UK |
+|Webfax 1 |UK |
+|Webfax 2 |UK |
 
 My mission: add as many Teletext services as possible. So let me know if you have any wishes.
 

@@ -24,7 +24,8 @@ With this program you configure:
 |CLR HOME|Go to favorite start page |
 |+| Go to current page +1 / next page|
 |-| Go to current page -1 / previous page|
-|←| Go to previous teletext page (max. 20 steps back). Resets when changing stations.|
+|↑| Step back through visited pages|
+|←| Go back to the WiC64 Portal|
 |UP | Subpage up |
 |DN | Subpage down |
 |R | Refresh current teletext page |
@@ -39,7 +40,7 @@ With this program you configure:
 |F5 | Fastext yellow |
 |F7 | Fastext cyan |
 |F8 | Help screen |
+|C= + S | Stopwatch ON/OFF toggle - measures total time needed for HTTP fetch, decode & rendering page on screen |
 
 ## PetsciiProxy 
 Using the public petsciiproxy.nl server is highly recommended and is the default setting. But if you do want to run it locally you could. This runs on your PC (or Mac/Linux/NAS/..) and acts as a bridge between the internet and your C64 Ultimate/Other Ultimate product running Teletext64U. The default listening port is 8080. You can change the port by starting PetsciiProxy with a command line parameter. Start the program with --help for all parameter options.
-
