@@ -5,7 +5,7 @@ Teletext program showing live pages from the internet for the Commodore 64 Ultim
 The program also runs on an original stock C64/C128 in C64 mode with a WiC64 or an Ultimate II+ cartridge.
 
 ### Great news!
-Teletext 64 Ultimate has its own dedicated public server at petsciiproxy.nl, so you no longer need to run a local server. The WiC64 version is now available in the WiC Portal and also runs in the VICE emulator!
+Teletext 64 Ultimate has its own dedicated server at petsciiproxy.nl, so you no longer need to run a local server. The WiC64 version is now available in the WiC Portal and also runs in the VICE emulator!
 
 ### Currently supporting:
 
@@ -29,8 +29,12 @@ Teletext 64 Ultimate has its own dedicated public server at petsciiproxy.nl, so 
 |Chunkytext |UK |
 |Webfax 1 |UK |
 |Webfax 2 |UK |
+|SPARK TVARK teletext |UK |
 
 My mission: add as many Teletext services as possible. So let me know if you have any wishes.
+
+## Installation
+Read the PDF in the docs folder!
 
 ## Description
 100% teletext compliant by using proper teletext character sets including the special graphic (mosaic) characters and support for the most common diacrits / accent marks. It runs in hires bitmap mode to support all the required foreground/background color combinations. To make the look & feel even more authentic, it can be used with a super bright RGB palette; so no washed out default C64 colors.

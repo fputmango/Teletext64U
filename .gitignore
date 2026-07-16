@@ -23,6 +23,7 @@
 !/PetsciiProxy/dist/petsciiproxy-mac-intel
 !/PetsciiProxy/dist/petsciiproxy-windows.exe
 !/PetsciiProxy/dist/petsciiproxy-raspberrypi-32bit
+!/PetsciiProxy/dist/petsciiproxy-raspberrypi-1B
 
 !/Teletext64U/
 !/Teletext64U/target/

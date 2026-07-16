@@ -1,5 +1,23 @@
 # **Teletext64U** changelog
 
+## [2.1.1] - 2026-07-16
+
+### Added
+- New station: SPARK - TVARK teletext, more info on https://tvark.org/
+- PetsciiProxy new target: raspberrypi-1B - specifically for the Pi 1 and Pi Zero (W) models.
+
+### Changed Teletext64U
+- Loading / saving the config was bound to device 8. Now the device number is read at program start and used for loading and saving. Device range supported: 8 to 11. Thanks to Arndt for pointing me on this issue.
+- Pagenumber top left is shifted 1 position to the right; aligns better with the teletext page.
+
+### Fixed
+- The WiC64 D64 version now stores the user preferences on disk again, like it used to. Note: the WiC64 stand alone PRG version is the one that is used on the WiC64 Portal and can also be run locally with going to the portal first.
+
+### Notes 
+- Updated Teletext64U Notes.pdf in docs folder.
+- Teletext64WiC64.d64 is renamed to Teletext64W.d64.
+
+
 ## [2.1.0] - 2026-07-11
 
 ### Added

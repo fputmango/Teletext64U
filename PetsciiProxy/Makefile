@@ -7,6 +7,7 @@ build:
 	GOOS=linux GOARCH=386 go build -o ./dist/${BINARY_NAME}-linux-386 .
 	GOOS=linux GOARCH=amd64 go build -o ./dist/${BINARY_NAME}-linux-64bit .
 	GOOS=linux GOARCH=arm GOARM=7 go build -o ./dist/${BINARY_NAME}-raspberrypi-32bit .
+	GOOS=linux GOARCH=arm GOARM=6 go build -o ./dist/${BINARY_NAME}-raspberrypi-1B .
 
 # Upload to Development 
 release-dev:

@@ -25,6 +25,7 @@ Supported teletext services:
 - ORF 1, ORF 2, ORF III, ORF Sport+ (Austria)
 - Chunkytext (UK)
 - Webfax 1 & Webfax 1 (UK)
+- SPARK
 
 Next up candidates:
 - RTP teletexto (Portugal) - https://www.rtp.pt/wportal/fab-txt/texto/100/100_0001.htm
@@ -89,7 +90,7 @@ import (
 )
 
 // Version
-const pp_version = "2.1.0"
+const pp_version = "2.1.1"
 
 // Supported teletext services
 const (
@@ -111,6 +112,7 @@ const (
 	DirCHUNKYTEXT = "CHUNKYTEXT"
 	DirWEBFAX1    = "WEBFAX1"
 	DirWEBFAX2    = "WEBFAX2"
+	DirSPARK      = "SPARK"
 	DirUD         = "UD"
 )
 
@@ -135,6 +137,7 @@ var handlers = map[string]http.HandlerFunc{
 	DirCHUNKYTEXT: chunkytextHandler,
 	DirWEBFAX1:    webfax1Handler,
 	DirWEBFAX2:    webfax2Handler,
+	DirSPARK:      sparkHandler,
 	DirTEKSTI:     tekstiHandler,
 	DirSVT:        svttextHandler,
 	DirDR:         drteksttvHandler,
@@ -189,6 +192,50 @@ type NavignationInfo struct {
 	nextSubpage      int
 	numberOfSubpages int
 	cycleTime        int
+}
+
+// Data to store in the log file (CSV format)
+type LogEntry struct {
+	Date      string
+	Time      string
+	IPAddress string
+	Station   string
+	Page      string
+}
+
+// Global channel for background logger
+var logChan = make(chan LogEntry, 100) // Buffer 100 entries to handle peaks
+
+// startCSVLogger runs in background and processes the log queue
+func startCSVLogger() {
+	dataDir := "./data"
+	if err := os.MkdirAll(dataDir, 0755); err != nil {
+		fmt.Printf("CSV Logger Error: map %s kon niet worden aangemaakt: %v\n", dataDir, err)
+		return
+	}
+
+	csvPath := filepath.Join(dataDir, "pp-history.csv")
+
+	file, err := os.OpenFile(csvPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		fmt.Printf("CSV Logger Error: could not open %s: %v\n", csvPath, err)
+		return
+	}
+	defer file.Close()
+
+	// Listen to incoming log data from the channel
+	for entry := range logChan {
+		logLine := fmt.Sprintf("%s,%s,%s,%s,%s\n",
+			entry.Date,
+			entry.Time,
+			entry.IPAddress,
+			entry.Station,
+			entry.Page,
+		)
+		if _, err := file.WriteString(logLine); err != nil {
+			fmt.Printf("CSV Logger Schrijffout: %v\n", err)
+		}
+	}
 }
 
 // ARD Text
@@ -392,6 +439,8 @@ If you do not have one, you can request one here: https://developer.yle.fi/en/in
 	mux.HandleFunc("/UD/", udHandler)
 	mux.HandleFunc("/ud/", udHandler)
 
+	go startCSVLogger()
+
 	syncChunkytextRepo()
 	go func() {
 		ticker := time.NewTicker(chunkytextSyncInterval)
@@ -410,10 +459,39 @@ If you do not have one, you can request one here: https://developer.yle.fi/en/in
 	}
 }
 
+/*
+	func getPageName(r *http.Request, dirStation string) string {
+		id := r.PathValue("id")
+		pageName := strings.TrimPrefix(id, "/")
+		logPageRequest(dirStation, pageName)
+		return pageName
+	}
+*/
 func getPageName(r *http.Request, dirStation string) string {
 	id := r.PathValue("id")
 	pageName := strings.TrimPrefix(id, "/")
+
+	now := time.Now()
+	dateStr := now.Format("2006-01-02")
+	timeStr := now.Format("15:04:05")
+	clientIP := getClientIP(r)
+
+	// Log to console
 	logPageRequest(dirStation, pageName)
+
+	// fire log data in the channel asynchronously
+	select {
+	case logChan <- LogEntry{
+		Date:      dateStr,
+		Time:      timeStr,
+		IPAddress: clientIP,
+		Station:   dirStation,
+		Page:      pageName,
+	}:
+	default:
+		// If buffer 100 overflow (DDOS?), prevent server from blocking
+		fmt.Println("CSV Logger warning: log queue is full, entry skipped.")
+	}
 	return pageName
 }
 
@@ -2740,7 +2818,7 @@ func teefaxHandler(w http.ResponseWriter, r *http.Request) {
 	writeResponse(w, DirTEEFAX, pageName)
 }
 
-// --- Webfax1 ---
+// --- Webfax 1 ---
 
 func webfax1Handler(w http.ResponseWriter, r *http.Request) {
 	pageName := getPageName(r, DirWEBFAX1)
@@ -2748,12 +2826,20 @@ func webfax1Handler(w http.ResponseWriter, r *http.Request) {
 	writeResponse(w, DirWEBFAX1, pageName)
 }
 
-// --- Webfax1 ---
+// --- Webfax 2 ---
 
 func webfax2Handler(w http.ResponseWriter, r *http.Request) {
 	pageName := getPageName(r, DirWEBFAX2)
 	webfax2GetTeletexPage(pageName)
 	writeResponse(w, DirWEBFAX2, pageName)
+}
+
+// --- SPARK ---
+
+func sparkHandler(w http.ResponseWriter, r *http.Request) {
+	pageName := getPageName(r, DirSPARK)
+	sparkGetTeletexPage(pageName)
+	writeResponse(w, DirSPARK, pageName)
 }
 
 // --- ChunkyText (git-mirrored teletext service) ---
@@ -2961,6 +3047,38 @@ func webfax2GetTeletexPage(pageNr string) {
 
 	output = append(output, []byte("</pre>")...)
 	os.WriteFile(filepath.Join(DirWEBFAX2, pageNr), output, 0644)
+}
+
+func sparkGetTeletexPage(pageNr string) {
+	parts := strings.Split(pageNr, "-")
+	url := fmt.Sprintf("https://raw.githubusercontent.com/spark-teletext/spark-teletext/master/P%s.tti", parts[0])
+	logFetchingPage(url)
+	resp, err := http.Get(url)
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		fmt.Println("HTTP Error: Could not retrieve page", pageNr, "Status:", resp.StatusCode)
+		return
+	}
+
+	rows, nav := parseTTIRows(resp.Body, parts[0], parts[1], true) // parts[1] = subpagenumber
+	ps, ns, ct := getPrevNextSubpage(parts[0], nav)
+
+	var output []byte
+	output = append(output, []byte(fmt.Sprintf(
+		"pn=p_\npn=n_\n%v%v%vftl=%v-0\nftl=%v-0\nftl=%v-0\nftl=%v-0\n<pre>",
+		ps, ns, ct,
+		string(ftl[0]), string(ftl[1]), string(ftl[2]), string(ftl[3])))...)
+
+	for _, r := range rows {
+		output = append(output, r...)
+	}
+
+	output = append(output, []byte("</pre>")...)
+	os.WriteFile(filepath.Join(DirSPARK, pageNr), output, 0644)
 }
 
 // currently used by ceefax, teefax, zdf, svt
