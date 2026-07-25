@@ -1,5 +1,21 @@
 # **Teletext64U** changelog
 
+## [2.2.0] - 2026-07-25
+
+### Added Teletext64U
+- New **Quick Navigation** feature: Use the left/right cursor keys to cycle through highlighted linked subpages, shown in light red on white (or vice versa, depending on the background colour). Press RETURN to jump directly to the highlighted page number. Super handy! Why? Because you can now quickly browse linked pages and jump back to previously visited pages using just one hand on the right side of the C64 keyboard.  
+- Animated Loading Dots: When a page fetch takes longer than 0.5 seconds, Teletext64U displays alternating dots to indicate that it requires more time. In normal use, this new feature remains invisible. I first experienced a severe slowdown—and even downtime—with Teefax, which suddenly became sluggish or completely unreachable. If a service is unavailable, a previously cached page is served as a fallback. Note: This feature is only implemented in the Ultimate edition. In the WiC64 edition, the library implementation disables interrupts and handles the HTTP GET as an opaque, atomic, blocking call, making it impossible to check the connection status after 0.5 seconds.
+
+### Added PetsciiProxy
+- Added per-page freshness caching: repeated requests for the same page are served straight from disk instead of re-fetching online every time. If a page is older than 60 seconds a fresh page will be fetched.
+- Added per-station outage detection: once a station's backend stops responding, PetsciiProxy stops retrying it on every request and just serves the last cached page (or 404) for 5 minutes before automatically trying again.
+- Added a general function that scans a teletext page for linked pagenumbers. If found, they will be added to the header section of the teletext page served.
+- Log shows when a page was served from cache instead of fetched live.
+
+### Notes 
+- With this release, it is important to use both the updated petsciiproxy server and Teletext64U. A new header field has been introduced with this release (lnk=nnn,rr,cc,h), where nnn is the pagenumber, which could be page 404. Previous versions of Teletext64U scanned the incoming HTTP response for a 404 to determine if a page exists. This new version double-checks if the 404 appears on a lnk= or ftl= line. The effect of using older Teletex64U versions is that an existing page -such as page 400 with links to 4xx pages- will be falsely flagged as a 'not found', resulting in a red P400 in the top left corner.
+
+
 ## [2.1.1] - 2026-07-16
 
 ### Added
@@ -122,7 +138,7 @@
 - Teletext64: Sets CPU speed to 40Mhz at runtime.
 - Teletext64: Using VIC-II bank 2 for teletext bitmap -> more available memory for extending the program with new features.  
 - Teletext64: The fonts are split up into smaller parts. Now there are seperate font files for characters and mosaics. I also created a seperate font for 'Latin National Option Sub-sets' (ETSI EN 300 706 V1.2.1), currently supporting: English, French, Swedish/Finnish, German, Spanish/Portugese and Italian. This set could be extended in the future when adding new teletext services. Visible characters start at $20, everything below is used for extended ASCII character support.
-- Teletext64 Wic64 version: removed beta debug screen, so no more change in border color with error codes when a page doesn't exist. Several people have confirmed it works on both original C64s and Ultimates.
+- Teletext64 Wic64 version: removed beta debug screen, so no more change in border colour with error codes when a page doesn't exist. Several people have confirmed it works on both original C64s and Ultimates.
 
 
 ## [1.6.3] - 2026-05-20
@@ -164,10 +180,10 @@
 - The green conceal icon in the header row is steady now (previously flashing).
 
 ### Notes on DR Tekst-TV
-- This time no html/xml/tti or other format available for this teletext service to work with, only generated teletext images (https://www.dr.dk/cgi-bin/fttv1.exe/100) or plain text (https://www.dr.dk/cgi-bin/fttx2.exe/100) without any color information.
-- For this service I used the plain text service to parse the data. That was the easy part. Using plain text mode and applying colors and mosaics in post-fix was a lot of manual labour. Most -but not all- of the colors per page or page group were reconstructed.
+- This time no html/xml/tti or other format available for this teletext service to work with, only generated teletext images (https://www.dr.dk/cgi-bin/fttv1.exe/100) or plain text (https://www.dr.dk/cgi-bin/fttx2.exe/100) without any colour information.
+- For this service I used the plain text service to parse the data. That was the easy part. Using plain text mode and applying colours and mosaics in post-fix was a lot of manual labour. Most -but not all- of the colours per page or page group were reconstructed.
 - https://zxnet.co.uk/teletext/editor/ was used to reconstruct some of the mosaics, like the DR-logo, DMI-logo and weather map. 
-- Because layout differs per page, and the content is not always fixed, I had to write algoritms to dynamically determine where to apply color control codes. We have to see over time how stable this is.
+- Because layout differs per page, and the content is not always fixed, I had to write algoritms to dynamically determine where to apply colour control codes. We have to see over time how stable this is.
 -  A note about the red/yellow progress bars for DR1 and DR2 on page 100: They are accurate and calculated based on the start times of the tv-shows and the current time.
 - Page 438 has a concealed message regarding summer/winter time (press 'C' to show the message).
 
@@ -204,7 +220,7 @@
 - '←' - Go to previous teletext page (max. 20 steps back). Resets when changing stations.
 
 ### Notes on SVT Text
-- Some of the teletext pages appear to be quite messy "under the hood"—though that may also be down to my parsing skills. Manual intervention was required on several pages to correct control codes within the code to ensure they display properly. I’m unsure if these issues stem from the API itself or its underlying source. Furthermore, the API’s handling of mosaic characters is unusual; it references GIF images using an obscure numeric coding system with hard-coded colors. While I’ve aimed for completeness, some edge cases may remain. Specifically, the graphic on the weather page (401) is currently inaccurate and requires further work.
+- Some of the teletext pages appear to be quite messy "under the hood"—though that may also be down to my parsing skills. Manual intervention was required on several pages to correct control codes within the code to ensure they display properly. I’m unsure if these issues stem from the API itself or its underlying source. Furthermore, the API’s handling of mosaic characters is unusual; it references GIF images using an obscure numeric coding system with hard-coded colours. While I’ve aimed for completeness, some edge cases may remain. Specifically, the graphic on the weather page (401) is currently inaccurate and requires further work.
 - Bottom row: Displays fixed Fastext links and a subpage indicator for user convenience when applicable. For some reason SVT Text rarely provides this most of the time. E.g. https://www.svt.se/text-tv/331 The official SVT Text on the web shows all the subpages at once. Maybe a subpage indicator is available on SVT Text on an actual TV.
 - Dates: The header reflects the original publishing date and time from the Teletext page. Since older pages are occasionally still hosted, any "stale" content will display the full date including the year (DD-MM-YYYY). E.g. https://texttv.nu/221 ('Hem › Ekonomi › 221').
 
@@ -233,7 +249,7 @@
 - Also worth mentioning is index page 670, which lists major European soccer leagues by country.
 - They have some pages in English starting from page 190.
 - Ex
-- Some nice colorful pages: 811, 890-
+- Some nice colourful pages: 811, 890-
 
 ### Note on Teletext64U
 - With the growing number of teletext services, pressing 'S' to switch stations all the time is not the best way. I will look into implementing a list for quick selection.
@@ -292,8 +308,8 @@ On TEEFAX page 532/8 is a really cool subpage! Go check it out, you will find a 
 
 ### Remarks ARD-TEXT
 - It works almost 100%. There are some minor spacing situations to address. For example: At page 403 you will see famous people with their birth date's in yellow and below in white text a little biography. This block of text should be idented one space to the right.
-- I had to fix the 3 rows on the top on each page (except page 100). The html pulled off some weird tricks that had to be corrected when parsing the data. This has to do with how teletext works. When you want to change color for example, the control character needed to do this takes 1 position on screen and won't be visible. A control character will be replaced by a space on screen.
-- Fast Text Links (those 4 colored words on the bottom row): ARD-TEXT does not provide these (not online, nor on TV), so I made up then myself. They are always the same for every page. I could make this smarter in a future release to make them dynamic.
+- I had to fix the 3 rows on the top on each page (except page 100). The html pulled off some weird tricks that had to be corrected when parsing the data. This has to do with how teletext works. When you want to change colour for example, the control character needed to do this takes 1 position on screen and won't be visible. A control character will be replaced by a space on screen.
+- Fast Text Links (those 4 coloured words on the bottom row): ARD-TEXT does not provide these (not online, nor on TV), so I made up then myself. They are always the same for every page. I could make this smarter in a future release to make them dynamic.
 
 
 ## [1.0.2] - 2026-03-07

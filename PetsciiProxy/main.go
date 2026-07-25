@@ -28,14 +28,15 @@ Supported teletext services:
 - SPARK
 
 Next up candidates:
+- WDR text: https://mobiltext.wdr.de/%s.html
 - RTP teletexto (Portugal) - https://www.rtp.pt/wportal/fab-txt/texto/100/100_0001.htm
 - HR-text (German) https://www.hr-text.hr-fernsehen.de/ttxweb/?page=100
 - ...?
 
 The NOS-TT file format is being used for the other teletext services:
-Is set up fairly efficient: mostly around 1073 bytes; a little bit bigger if a page has sub pages.
+Is set up fairly efficient: mostly around 1073 bytes; a little bit bigger if a page has subpages.
 The file format is a text block with (sub)page and fastext links followed by a <pre>..</pre> block
-which contains 1000 bytes of raw teletext data (control codes, text and mosiac/graphic characters)
+which contains 1000 bytes of raw teletext data (control codes, text and mosiac/graphic characters).
 
 It looks like this:
     pn=p_503-1
@@ -47,11 +48,17 @@ It looks like this:
     ftl=102-0
     ftl=103-0
     ftl=601-0
-    <pre>
+	lnk=128,07,37
+	lnk=110,09,37
+	lnk=109,11,37
+	<pre>
     ...40 columns x 25 rows = 1000 bytes of raw teletext data
     </pre>
 
-Note: the ct=n parameter was added; it's not NOS-TT native. Cycle time is used when rotating between subpages. n is the delay in seconds.
+Note: I added new parameters which are not NOS-TT native!
+ct=n; cycle time is used for rotating between subpages. n is the delay in seconds.
+lnk=nnn,rr,cc; these represent pagenumber references from the current page with their screen coordinate.
+E.g. lnk=110,09,37 refers to page 110 on row 9 column 37 (counting from 0,0).
 
 Why transform to the NOS-TT format? Basically to keep things simple for the Teletext64U viewer program on the C64.
 - It only has to support one uniform way of communicating with this proxy program.
@@ -90,16 +97,17 @@ import (
 )
 
 // Version
-const pp_version = "2.1.1"
+const pp_version = "2.2.0"
 
 // Supported teletext services
 const (
-	DirNOS        = "NOS-TT"
-	DirARD        = "ARD-TEXT"
-	DirZDF        = "ZDF-TEXT"
-	DirZDFinfo    = "ZDFINFO"
-	DirZDFneo     = "ZDFNEO"
-	Dir3sat       = "3SAT"
+	DirNOS     = "NOS-TT"
+	DirARD     = "ARD-TEXT"
+	DirZDF     = "ZDF-TEXT"
+	DirZDFinfo = "ZDFINFO"
+	DirZDFneo  = "ZDFNEO"
+	Dir3sat    = "3SAT"
+	//DirWDR        = "WDR-TEXT"
 	DirORF1       = "ORF1"
 	DirORF2       = "ORF2"
 	DirORF3       = "ORF3"
@@ -122,25 +130,26 @@ const chunkytextSyncInterval = 15 * time.Minute
 
 // Each service has its own handler
 var handlers = map[string]http.HandlerFunc{
-	DirNOS:        nosttHandler,
-	DirARD:        ardtextHandler,
-	DirZDF:        zdftextHandler,
-	DirZDFinfo:    zdfinfoHandler,
-	DirZDFneo:     zdfneoHandler,
-	Dir3sat:       zdf3satHandler,
-	DirORF1:       orf1Handler,
-	DirORF2:       orf2Handler,
-	DirORF3:       orf3Handler,
-	DirORFSport:   orfSportHandler,
-	DirCEEFAX:     ceefaxHandler,
-	DirTEEFAX:     teefaxHandler,
-	DirCHUNKYTEXT: chunkytextHandler,
-	DirWEBFAX1:    webfax1Handler,
-	DirWEBFAX2:    webfax2Handler,
-	DirSPARK:      sparkHandler,
-	DirTEKSTI:     tekstiHandler,
-	DirSVT:        svttextHandler,
-	DirDR:         drteksttvHandler,
+	DirNOS:     makeHandler(DirNOS, nosttGetTeletexPage),
+	DirARD:     makeHandler(DirARD, ardtextGetTeletexPage),
+	DirZDF:     makeHandler(DirZDF, func(p string) bool { return zdftextGetTeletexPage(p, "zdf", DirZDF) }),
+	DirZDFinfo: makeHandler(DirZDFinfo, func(p string) bool { return zdftextGetTeletexPage(p, "zdfinfo", DirZDFinfo) }),
+	DirZDFneo:  makeHandler(DirZDFneo, func(p string) bool { return zdftextGetTeletexPage(p, "zdfneo", DirZDFneo) }),
+	Dir3sat:    makeHandler(Dir3sat, func(p string) bool { return zdftextGetTeletexPage(p, "3sat", Dir3sat) }),
+	//DirWDR:        makeHandler(DirWDR, wdrtextGetTeletexPage),
+	DirORF1:       makeHandler(DirORF1, func(p string) bool { return orfGetTeletexPage(p, "orf1", DirORF1) }),
+	DirORF2:       makeHandler(DirORF2, func(p string) bool { return orfGetTeletexPage(p, "orf2", DirORF2) }),
+	DirORF3:       makeHandler(DirORF3, func(p string) bool { return orfGetTeletexPage(p, "orfiii", DirORF3) }),
+	DirORFSport:   makeHandler(DirORFSport, func(p string) bool { return orfGetTeletexPage(p, "sportplus", DirORFSport) }),
+	DirCEEFAX:     makeHandler(DirCEEFAX, ceefaxGetTeletexPage),
+	DirTEEFAX:     makeHandler(DirTEEFAX, teefaxGetTeletexPage),
+	DirCHUNKYTEXT: makeHandler(DirCHUNKYTEXT, chunkytextGetTeletexPage),
+	DirWEBFAX1:    makeHandler(DirWEBFAX1, func(p string) bool { return webfaxGetTeletexPage(p, "Webfax", DirWEBFAX1) }),
+	DirWEBFAX2:    makeHandler(DirWEBFAX2, func(p string) bool { return webfaxGetTeletexPage(p, "Webfax2", DirWEBFAX2) }),
+	DirSPARK:      makeHandler(DirSPARK, sparkGetTeletexPage),
+	DirTEKSTI:     makeHandler(DirTEKSTI, tekstiGetTeletexPage),
+	DirSVT:        makeHandler(DirSVT, svttextGetTeletexPage),
+	DirDR:         makeHandler(DirDR, drteksttvGetTeletexPage),
 }
 
 var chunkytextMutex sync.RWMutex
@@ -210,7 +219,7 @@ var logChan = make(chan LogEntry, 100) // Buffer 100 entries to handle peaks
 func startCSVLogger() {
 	dataDir := "./data"
 	if err := os.MkdirAll(dataDir, 0755); err != nil {
-		fmt.Printf("CSV Logger Error: map %s kon niet worden aangemaakt: %v\n", dataDir, err)
+		fmt.Printf("CSV Logger Error: map %s could not be created: %v\n", dataDir, err)
 		return
 	}
 
@@ -233,7 +242,7 @@ func startCSVLogger() {
 			entry.Page,
 		)
 		if _, err := file.WriteString(logLine); err != nil {
-			fmt.Printf("CSV Logger Schrijffout: %v\n", err)
+			fmt.Printf("CSV Logger write error: %v\n", err)
 		}
 	}
 }
@@ -376,7 +385,7 @@ func getClientIP(r *http.Request) string {
 	return ip
 }
 
-// ipLoggingMiddleware logs the client IP for every incoming request
+// logs the client IP for every incoming request
 func ipLoggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		now := time.Now()
@@ -430,7 +439,7 @@ If you do not have one, you can request one here: https://developer.yle.fi/en/in
 		mux.HandleFunc(fmt.Sprintf("/%s/{id}", name), handler)
 	}
 
-	// Create UD folder for user config storage and register handler
+	// Create UD folder (=User Data) for user config storage and register handler
 	// WiC64 firmware v2.1.0 uppercases the URL path, so register both cases
 	err = os.MkdirAll(DirUD, 0755)
 	if err != nil {
@@ -459,14 +468,6 @@ If you do not have one, you can request one here: https://developer.yle.fi/en/in
 	}
 }
 
-/*
-	func getPageName(r *http.Request, dirStation string) string {
-		id := r.PathValue("id")
-		pageName := strings.TrimPrefix(id, "/")
-		logPageRequest(dirStation, pageName)
-		return pageName
-	}
-*/
 func getPageName(r *http.Request, dirStation string) string {
 	id := r.PathValue("id")
 	pageName := strings.TrimPrefix(id, "/")
@@ -476,7 +477,6 @@ func getPageName(r *http.Request, dirStation string) string {
 	timeStr := now.Format("15:04:05")
 	clientIP := getClientIP(r)
 
-	// Log to console
 	logPageRequest(dirStation, pageName)
 
 	// fire log data in the channel asynchronously
@@ -511,34 +511,118 @@ func writeResponse(w http.ResponseWriter, dirStation string, pageName string) {
 	}
 }
 
-// --- NOS Teletekst ---
+// Fetches (and caches to disk) one teletext page for a station, and reports whether the station's
+// backend was reachable.
+type fetchFunc func(pageNr string) bool
 
-func nosttHandler(w http.ResponseWriter, r *http.Request) {
-	pageName := getPageName(r, DirNOS)
-	nosttGetTeletexPage(pageName)
-	writeResponse(w, DirNOS, pageName)
+// If a page is older than 1 minute it will be fetched from internet, otherwise from disk cache
+const freshTTL = 60 * time.Second
+
+// Stations reported offline will be checked every 5 minutes to see if they are online again
+const stationRecheckInterval = 5 * time.Minute
+
+// This lists stations whose fetch function reads from local storage (a git mirror, a saved
+// archive, ...) instead of making a live network call. Currently only Chunkeytext.
+// note: syncChunkytextRepo checks if there is a newer repo.
+var localOnlyStations = map[string]bool{
+	DirCHUNKYTEXT: true,
 }
 
-func nosttGetTeletexPage(pageNr string) {
+type stationHealth struct {
+	offline   bool
+	lastCheck time.Time
+}
+
+var (
+	healthMu sync.Mutex
+	health   = map[string]*stationHealth{}
+)
+
+// returns file age
+func modTime(path string) time.Time {
+	info, err := os.Stat(path)
+	if err != nil {
+		return time.Time{}
+	}
+	return info.ModTime()
+}
+
+// reports whether the cached file was written within the last freshTTL
+func isFresh(path string) bool {
+	t := modTime(path)
+	return !t.IsZero() && time.Since(t) < freshTTL
+}
+
+// reports whether it's OK to try a live fetch for this station right now. A station that has never
+// failed (or isn't currently marked offline) always returns true. Once marked offline, it's only
+// retried after stationRecheckInterval has passed since the last attempt.
+func shouldAttemptFetch(dirStation string) bool {
+	healthMu.Lock()
+	defer healthMu.Unlock()
+	h, ok := health[dirStation]
+	if !ok || !h.offline {
+		return true
+	}
+	return time.Since(h.lastCheck) >= stationRecheckInterval
+}
+
+// updates a station's health state after a fetch attempt
+func recordFetchResult(dirStation string, reachable bool) {
+	healthMu.Lock()
+	defer healthMu.Unlock()
+	h, ok := health[dirStation]
+	if !ok {
+		h = &stationHealth{}
+		health[dirStation] = h
+	}
+	h.offline = !reachable
+	h.lastCheck = time.Now()
+}
+
+// builds the HTTP handler for one station: parse the requested page name, then either serve a
+// still-fresh cached copy, skip the fetch because the station is in its offline cooldown, or run
+// the station's fetch function and record whether it actually reached the backend.
+func makeHandler(dirStation string, fetch fetchFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		pageName := getPageName(r, dirStation)
+		path := filepath.Join(dirStation, pageName)
+		if localOnlyStations[dirStation] {
+			fetch(pageName)
+			writeResponse(w, dirStation, pageName)
+			return
+		}
+		if !isFresh(path) && shouldAttemptFetch(dirStation) {
+			reachable := fetch(pageName)
+			recordFetchResult(dirStation, reachable)
+		} else {
+			logFetchingPage(path)
+		}
+		writeResponse(w, dirStation, pageName)
+	}
+}
+
+// --- NOS Teletekst ---
+
+func nosttGetTeletexPage(pageNr string) bool {
 	urlData := fmt.Sprintf("https://teletekst-data.nos.nl/page/%s", pageNr)
 	logFetchingPage(urlData)
 	client := http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Get(urlData)
 	if err != nil {
 		fmt.Println("Connection Error:", err)
-		return
+		return false
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
 		fmt.Println("HTTP Error: Could not retrieve page", pageNr, "Status:", resp.StatusCode)
-		return
+		return true
 	}
 
 	rawData, err := io.ReadAll(resp.Body)
 	if err != nil {
 		fmt.Println("Read error:", err)
-		return
+		return true
 	}
 
 	txtContent := string(rawData)
@@ -609,23 +693,187 @@ func nosttGetTeletexPage(pageNr string) {
 			finalBytes[startIndex+13+2*40] = TCC_NORMAL_HEIGHT
 		}
 	}
+	savePage(DirNOS, pageNr, finalBytes)
+	return true
+}
 
-	filePath := filepath.Join(DirNOS, pageNr)
+// matches 3-digit candidates from 100 to 899
+var candidateBytesRegex = regexp.MustCompile(`[1-8]\d{2}`)
 
-	err = os.WriteFile(filePath, finalBytes, 0644)
-	if err != nil {
+// This looks for embedded page-number references / page links and returns a list of 'lnk=nnn,rr,cc,h' strings (if any)
+func scanPageLinks(body []byte) string {
+	var pageLinks strings.Builder
+	rowCount := len(body) / 40
+
+	for row := 1; row < rowCount; row++ { // skip row 0 because no page links in the header/date row
+		rowBytes := body[row*40 : row*40+40]
+		indexes := candidateBytesRegex.FindAllIndex(rowBytes, -1)
+
+		// Double-height tracking: This info will be added as a 0 or 1 value in the lnk= line at the end. This info is
+		// used by Teletext64U to determine if it has to highlight a single or double row pagenumber.
+		doubleheightAtCol := [40]bool{}
+		doubleheight := false
+		for col := 0; col < 40; col++ {
+			doubleheightAtCol[col] = doubleheight
+			switch rowBytes[col] {
+			case TCC_NORMAL_HEIGHT:
+				doubleheight = false
+			case TCC_DOUBLE_HEIGHT:
+				doubleheight = true
+			}
+		}
+
+		for _, loc := range indexes {
+			startIdx := loc[0]
+			endIdx := loc[1]
+			col := startIdx
+
+			// No valid page numbers beyond column 37
+			if col > 37 {
+				continue
+			}
+
+			candidate := rowBytes[startIdx:endIdx]
+
+			// (for now) don't include page links to 404 because teletext64 will think the server returned with a http 404 not found error
+			/*
+				if string(candidate) == "404" {
+					continue
+				}
+			*/
+
+			validPrefix := false
+			if col == 0 {
+				validPrefix = true
+			} else {
+				prev := rowBytes[startIdx-1]
+				if prev == ' ' || prev == 'p' || prev == 'P' || prev == '>' || prev == '-' || prev == ',' || prev == '.' || prev == '/' || prev < 32 {
+					validPrefix = true
+				}
+			}
+
+			if !validPrefix {
+				continue
+			}
+
+			validSuffix := false
+			if col == 37 {
+				validSuffix = true
+			} else {
+				next := rowBytes[endIdx]
+				if next == ' ' || next == ',' || next == '.' || next == '-' || next == '/' || next == '\n' || next < 32 {
+					validSuffix = true
+				}
+				if next == ',' || next == '.' {
+					// a space or teletext control code after the . / , is valid
+					if rowBytes[endIdx+1] == ' ' || rowBytes[endIdx+1] < 0x20 {
+						validSuffix = true
+					} else {
+						if endIdx+4 > len(rowBytes) {
+							validSuffix = false
+						} else {
+							followingBytes := rowBytes[endIdx+1 : endIdx+4]
+							val, err := strconv.Atoi(string(followingBytes))
+							if err != nil || val < 100 || val > 899 {
+								validSuffix = false
+							} else {
+								// Ensure the 3 digits are NOT part of a longer number like 2590 in 363,2590
+								if endIdx+4 < len(rowBytes) {
+									charAfterNext := rowBytes[endIdx+4]
+									if charAfterNext >= '0' && charAfterNext <= '9' {
+										validSuffix = false
+									}
+								}
+							}
+						}
+					}
+				}
+				if next == '/' {
+					validSlash := false
+					if endIdx+1 < len(rowBytes) && rowBytes[endIdx+1] >= '0' && rowBytes[endIdx+1] <= '9' {
+						// Count every consecutive digit after the slash (no cap).
+						digitEnd := endIdx + 1
+						for digitEnd < len(rowBytes) && rowBytes[digitEnd] >= '0' && rowBytes[digitEnd] <= '9' {
+							digitEnd++
+						}
+						digitCount := digitEnd - (endIdx + 1)
+						val, err := strconv.Atoi(string(rowBytes[endIdx+1 : digitEnd]))
+						if err == nil {
+							switch digitCount {
+							case 1, 2:
+								// subpage reference, e.g. /1 or /12
+								validSlash = val >= 1 && val <= 99
+							case 3:
+								// full page-number reference, e.g. /600
+								validSlash = val >= 100 && val <= 899
+							}
+							// 4+ digits: not a clean subpage or page reference, reject
+						}
+					}
+					if !validSlash {
+						validSuffix = false
+					}
+				}
+			}
+
+			if validSuffix {
+				h := 0
+				if doubleheightAtCol[col] {
+					h = 1
+				}
+				fmt.Fprintf(&pageLinks, "lnk=%s,%02d,%02d,%d\n", string(candidate), row, col, h)
+			}
+		}
+	}
+
+	//return pageLinks
+	return pageLinks.String()
+}
+
+// insertPageLinks scans the rendered page body (the bytes between <pre> and
+// </pre>) for teletext page-number references and, if any are found,
+// splices "lnk=nnn,rr,cc" lines into the header block right before <pre> -
+// the same place pn=/ftl=/ct= directives already live. The C64 client
+// already parses and acts on these (LNK_* in teletext_common.c), so this is
+// immediately usable by every station once wired through savePage.
+func insertPageLinks(output []byte) []byte {
+	preTag := []byte("<pre>")
+	postTag := []byte("</pre>")
+
+	preIdx := bytes.Index(output, preTag)
+	if preIdx == -1 {
+		return output
+	}
+	bodyStart := preIdx + len(preTag)
+
+	postIdx := bytes.Index(output[bodyStart:], postTag)
+	if postIdx == -1 {
+		return output
+	}
+	body := output[bodyStart : bodyStart+postIdx]
+
+	pageLinks := scanPageLinks(body)
+	if pageLinks == "" {
+		return output
+	}
+
+	result := make([]byte, 0, len(output)+len(pageLinks))
+	result = append(result, output[:preIdx]...)
+	result = append(result, []byte(pageLinks)...)
+	result = append(result, output[preIdx:]...)
+	return result
+}
+
+// The one place where every station's finished page gets written to disk. It inserts any page-number
+// links found in the rendered body, then writes the result.
+func savePage(dirStation string, pageNr string, output []byte) {
+	output = insertPageLinks(output)
+	if err := os.WriteFile(filepath.Join(dirStation, pageNr), output, 0644); err != nil {
 		fmt.Println("File write error:", err)
-		return
 	}
 }
 
 // --- ARD-TEXT ---
-
-func ardtextHandler(w http.ResponseWriter, r *http.Request) {
-	pageName := getPageName(r, DirARD)
-	ardtextGetTeletexPage(pageName)
-	writeResponse(w, DirARD, pageName)
-}
 
 func ardtextHasNextSubpage(page string, subpage string) int {
 	subpageNumber, err := strconv.Atoi(subpage)
@@ -657,19 +905,19 @@ func ardtextHasNextSubpage(page string, subpage string) int {
 	return subpageNumber
 }
 
-func ardtextGetTeletexPage(pageNr string) {
+func ardtextGetTeletexPage(pageNr string) bool {
 	parts := strings.Split(pageNr, "-")
 	url := fmt.Sprintf("https://www.ard-text.de/page_only.php?page=%s&sub=%s", parts[0], parts[1])
 	logFetchingPage(url)
 	resp, err := http.Get(url)
 	if err != nil {
-		return
+		return false
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
 		fmt.Println("HTTP Error: Could not retrieve page", pageNr, "Status:", resp.StatusCode)
-		return
+		return true
 	}
 
 	// determine number of subpages
@@ -712,7 +960,8 @@ func ardtextGetTeletexPage(pageNr string) {
 	}
 
 	output = append(output, []byte("</pre>")...)
-	os.WriteFile(filepath.Join(DirARD, pageNr), output, 0644)
+	savePage(DirARD, pageNr, output)
+	return true
 }
 
 var bgColor = byte(0)
@@ -1034,30 +1283,6 @@ func getArdDate() string {
 
 // --- ZDF-TEXT ---
 
-func zdftextHandler(w http.ResponseWriter, r *http.Request) {
-	pageName := getPageName(r, DirZDF)
-	zdftextGetTeletexPage(pageName, "zdf", DirZDF)
-	writeResponse(w, DirZDF, pageName)
-}
-
-func zdfinfoHandler(w http.ResponseWriter, r *http.Request) {
-	pageName := getPageName(r, DirZDFinfo)
-	zdftextGetTeletexPage(pageName, "zdfinfo", DirZDFinfo)
-	writeResponse(w, DirZDFinfo, pageName)
-}
-
-func zdfneoHandler(w http.ResponseWriter, r *http.Request) {
-	pageName := getPageName(r, DirZDFneo)
-	zdftextGetTeletexPage(pageName, "zdfneo", DirZDFneo)
-	writeResponse(w, DirZDFneo, pageName)
-}
-
-func zdf3satHandler(w http.ResponseWriter, r *http.Request) {
-	pageName := getPageName(r, Dir3sat)
-	zdftextGetTeletexPage(pageName, "3sat", Dir3sat)
-	writeResponse(w, Dir3sat, pageName)
-}
-
 // solveChallenge parses the JS challenge and returns the verification URL
 func solveChallenge(body string) (string, error) {
 	reTS := regexp.MustCompile(`'ts','(\d+)'`)
@@ -1143,7 +1368,7 @@ func setHeaders(req *http.Request, referer string) {
 	}
 }
 
-func zdftextGetTeletexPage(pageNr string, zdfStation string, dirStation string) {
+func zdftextGetTeletexPage(pageNr string, zdfStation string, dirStation string) bool {
 	var url string
 	parts := strings.Split(pageNr, "-")
 	subPage, _ := strconv.Atoi(parts[1])
@@ -1182,9 +1407,13 @@ func zdftextGetTeletexPage(pageNr string, zdfStation string, dirStation string) 
 	setHeaders(req, "")
 
 	resp, err := client.Do(req)
-	if err != nil || resp.StatusCode != 200 {
+	if err != nil {
 		fmt.Println(">>err: client.Do(req):", err)
-		return
+		return false
+	}
+	if resp.StatusCode != 200 {
+		fmt.Println(">>err: unexpected status:", resp.StatusCode)
+		return true
 	}
 	bodyBytes, _ := io.ReadAll(resp.Body)
 	body := string(bodyBytes)
@@ -1224,7 +1453,7 @@ func zdftextGetTeletexPage(pageNr string, zdfStation string, dirStation string) 
 			} else {
 				fmt.Println(body)
 			}
-			return
+			return true
 		}
 
 		sVal := extractNumber(body, "s")
@@ -1239,7 +1468,7 @@ func zdftextGetTeletexPage(pageNr string, zdfStation string, dirStation string) 
 		setHeaders(verifyReq, url)
 		verifyResp, err := client.Do(verifyReq)
 		if err != nil {
-			return
+			return false
 		}
 		verifyResp.Body.Close()
 
@@ -1248,7 +1477,7 @@ func zdftextGetTeletexPage(pageNr string, zdfStation string, dirStation string) 
 		setHeaders(finalReq, verifyURL)
 		finalResp, err := client.Do(finalReq)
 		if err != nil {
-			return
+			return false
 		}
 		defer finalResp.Body.Close()
 
@@ -1305,8 +1534,8 @@ func zdftextGetTeletexPage(pageNr string, zdfStation string, dirStation string) 
 	}
 
 	output = append(output, []byte("</pre>")...)
-	os.WriteFile(filepath.Join(dirStation, pageNr), output, 0644)
-
+	savePage(dirStation, pageNr, output)
+	return true
 }
 
 func parseZDFRows(body io.ReadCloser, zdfStation string, pageNr string) ([][]byte, NavignationInfo) {
@@ -1779,31 +2008,7 @@ func getZdfDate() string {
 
 // --- ORF text---
 
-func orf1Handler(w http.ResponseWriter, r *http.Request) {
-	pageName := getPageName(r, DirORF1)
-	orfGetTeletexPage(pageName, "orf1", DirORF1)
-	writeResponse(w, DirORF1, pageName)
-}
-
-func orf2Handler(w http.ResponseWriter, r *http.Request) {
-	pageName := getPageName(r, DirORF2)
-	orfGetTeletexPage(pageName, "orf2", DirORF2)
-	writeResponse(w, DirORF2, pageName)
-}
-
-func orf3Handler(w http.ResponseWriter, r *http.Request) {
-	pageName := getPageName(r, DirORF3)
-	orfGetTeletexPage(pageName, "orfiii", DirORF3)
-	writeResponse(w, DirORF3, pageName)
-}
-
-func orfSportHandler(w http.ResponseWriter, r *http.Request) {
-	pageName := getPageName(r, DirORFSport)
-	orfGetTeletexPage(pageName, "sportplus", DirORFSport)
-	writeResponse(w, DirORFSport, pageName)
-}
-
-func orfGetTeletexPage(pageNr string, station string, dirStation string) {
+func orfGetTeletexPage(pageNr string, station string, dirStation string) bool {
 	var url string
 	parts := strings.Split(pageNr, "-")
 	subPage, _ := strconv.Atoi(parts[1])
@@ -1818,12 +2023,12 @@ func orfGetTeletexPage(pageNr string, station string, dirStation string) {
 	logFetchingPage(url)
 	resp, err := http.Get(url)
 	if err != nil {
-		return
+		return false
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
 		fmt.Println("HTTP Error: Could not retrieve page", pageNr, "Status:", resp.StatusCode)
-		return
+		return true
 	}
 
 	var nav NavignationInfo
@@ -1889,7 +2094,8 @@ func orfGetTeletexPage(pageNr string, station string, dirStation string) {
 	}
 
 	output = append(output, []byte("</pre>")...)
-	os.WriteFile(filepath.Join(dirStation, pageNr), output, 0644)
+	savePage(dirStation, pageNr, output)
+	return true
 }
 
 func getORFDate() string {
@@ -2122,18 +2328,12 @@ func parseORFRows(body io.Reader, station string, pageNr string) ([][]byte, Navi
 
 // --- SVT Text ---
 
-func svttextHandler(w http.ResponseWriter, r *http.Request) {
-	pageName := getPageName(r, DirSVT)
-	svttextGetTeletexPage(pageName)
-	writeResponse(w, DirSVT, pageName)
-}
-
 var currentPage string
 
 // This date/time stamp will be fetched from within the HTML page; it is more accurate than using the current date/time from the system
 var dateAdded string
 
-func svttextGetTeletexPage(pageNr string) {
+func svttextGetTeletexPage(pageNr string) bool {
 	parts := strings.Split(pageNr, "-")
 	currentPage = parts[0]
 	//url := fmt.Sprintf("https://api.texttv.nu/api/get/%s?app=teletext64u", parts[0])
@@ -2142,20 +2342,20 @@ func svttextGetTeletexPage(pageNr string) {
 	logFetchingPage(url)
 	resp, err := http.Get(url)
 	if err != nil {
-		return
+		return false
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
 		fmt.Println("HTTP Error: Could not retrieve page", pageNr, "Status:", resp.StatusCode)
-		return
+		return true
 	}
 
 	// parse all rows; also gives information about the number of subpages
 	rows, nav, err := parseSVTRows(resp.Body, parts[1])
 	if err != nil {
 		fmt.Println(err.Error())
-		return
+		return true
 	}
 	if len(rows) > 24 {
 		rows = rows[:24]
@@ -2217,7 +2417,8 @@ func svttextGetTeletexPage(pageNr string) {
 	}
 	output = append(output, []byte("</pre>")...)
 
-	os.WriteFile(filepath.Join(DirSVT, pageNr), output, 0644)
+	savePage(DirSVT, pageNr, output)
+	return true
 }
 
 // Every line starts with a <span class="bgBl"> </span>, indicating an empty black space; we don't need this
@@ -2802,55 +3003,11 @@ func getSwedishDate() string {
 	}
 }
 
-// --- CEEFAX ---
-
-func ceefaxHandler(w http.ResponseWriter, r *http.Request) {
-	pageName := getPageName(r, DirCEEFAX)
-	ceefaxGetTeletexPage(pageName)
-	writeResponse(w, DirCEEFAX, pageName)
-}
-
-// --- TEEFAX ---
-
-func teefaxHandler(w http.ResponseWriter, r *http.Request) {
-	pageName := getPageName(r, DirTEEFAX)
-	teefaxGetTeletexPage(pageName)
-	writeResponse(w, DirTEEFAX, pageName)
-}
-
-// --- Webfax 1 ---
-
-func webfax1Handler(w http.ResponseWriter, r *http.Request) {
-	pageName := getPageName(r, DirWEBFAX1)
-	webfax1GetTeletexPage(pageName)
-	writeResponse(w, DirWEBFAX1, pageName)
-}
-
-// --- Webfax 2 ---
-
-func webfax2Handler(w http.ResponseWriter, r *http.Request) {
-	pageName := getPageName(r, DirWEBFAX2)
-	webfax2GetTeletexPage(pageName)
-	writeResponse(w, DirWEBFAX2, pageName)
-}
-
-// --- SPARK ---
-
-func sparkHandler(w http.ResponseWriter, r *http.Request) {
-	pageName := getPageName(r, DirSPARK)
-	sparkGetTeletexPage(pageName)
-	writeResponse(w, DirSPARK, pageName)
-}
-
 // --- ChunkyText (git-mirrored teletext service) ---
-
-func chunkytextHandler(w http.ResponseWriter, r *http.Request) {
-	pageName := getPageName(r, DirCHUNKYTEXT)
-	chunkytextGetTeletexPage(pageName)
-	writeResponse(w, DirCHUNKYTEXT, pageName)
-}
-
-func chunkytextGetTeletexPage(pageNr string) {
+// Return value is required to satisfy fetchFunc's signature but is ignored by makeHandler for
+// stations in localOnlyStations (this one included) - ChunkyText's own git-sync ticker tracks
+// reachability, not per-page reads.
+func chunkytextGetTeletexPage(pageNr string) bool {
 	parts := strings.Split(pageNr, "-")
 
 	chunkytextMutex.RLock()
@@ -2860,7 +3017,7 @@ func chunkytextGetTeletexPage(pageNr string) {
 	chunkytextMutex.RUnlock()
 	if err != nil {
 		fmt.Println("ChunkyText page not found:", pageNr, err)
-		return
+		return false
 	}
 	defer f.Close()
 
@@ -2878,7 +3035,8 @@ func chunkytextGetTeletexPage(pageNr string) {
 	}
 
 	output = append(output, []byte("</pre>")...)
-	os.WriteFile(filepath.Join(DirCHUNKYTEXT, pageNr), output, 0644)
+	savePage(DirCHUNKYTEXT, pageNr, output)
+	return true
 }
 
 func syncChunkytextRepo() {
@@ -2908,23 +3066,23 @@ func syncChunkytextRepo() {
 	}
 }
 
+// --- CEEFAX ---
+
 var ftl [][]byte // gets filled by parseTTIRows
 
-func ceefaxGetTeletexPage(pageNr string) {
+func ceefaxGetTeletexPage(pageNr string) bool {
 	parts := strings.Split(pageNr, "-")
 	url := fmt.Sprintf("https://feeds.nmsni.co.uk/svn/ceefax/Worldwide/P%s.tti", parts[0])
-	//url := fmt.Sprintf("https://github.com/Webfax-Teletext/Webfax-Teletext/raw/refs/heads/main/P%s.tti", parts[0])
-	//url := fmt.Sprintf("https://github.com/Webfax-Teletext/Webfax2-Teletext/raw/refs/heads/main/P%s.tti", parts[0])
 	logFetchingPage(url)
 	resp, err := http.Get(url)
 	if err != nil {
-		return
+		return false
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
 		fmt.Println("HTTP Error: Could not retrieve page", pageNr, "Status:", resp.StatusCode)
-		return
+		return true
 	}
 
 	rows, nav := parseTTIRows(resp.Body, parts[0], parts[1], true) // parts[1] = subpagenumber
@@ -2941,14 +3099,20 @@ func ceefaxGetTeletexPage(pageNr string) {
 	}
 
 	output = append(output, []byte("</pre>")...)
-	os.WriteFile(filepath.Join(DirCEEFAX, pageNr), output, 0644)
+	savePage(DirCEEFAX, pageNr, output)
+	return true
 }
 
-func teefaxGetTeletexPage(pageNr string) {
+// --- TEEFAX ---
+
+func teefaxGetTeletexPage(pageNr string) bool {
 	parts := strings.Split(pageNr, "-")
 	url, err := getTeefaxURL(parts[0])
 	if err != nil {
-		fmt.Printf("Page %s: Error: %v", parts[0], err)
+		// Page not in the TEEFAX directory listing; not a connectivity problem because the directory
+		// was fetched and parsed. So station's reachability issue here.
+		fmt.Printf("Page %s: Error: %v\n", parts[0], err)
+		return true
 	}
 
 	if strings.HasPrefix(pageNr, "100") {
@@ -2959,13 +3123,13 @@ func teefaxGetTeletexPage(pageNr string) {
 	logFetchingPage(url)
 	resp, err := http.Get(url)
 	if err != nil {
-		return
+		return false
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
 		fmt.Println("HTTP Error: Could not retrieve page", pageNr, "Status:", resp.StatusCode)
-		return
+		return true
 	}
 
 	rows, nav := parseTTIRows(resp.Body, parts[0], parts[1], false) // parts[1] = subpagenumber
@@ -2982,25 +3146,28 @@ func teefaxGetTeletexPage(pageNr string) {
 	}
 
 	output = append(output, []byte("</pre>")...)
-	os.WriteFile(filepath.Join(DirTEEFAX, pageNr), output, 0644)
+	savePage(DirTEEFAX, pageNr, output)
+	return true
 }
 
-func webfax1GetTeletexPage(pageNr string) {
+// --- Webfax 1 & 2 ---
+
+func webfaxGetTeletexPage(pageNr string, station string, dirStation string) bool {
 	parts := strings.Split(pageNr, "-")
-	url := fmt.Sprintf("https://github.com/Webfax-Teletext/Webfax-Teletext/raw/refs/heads/main/P%s.tti", parts[0])
+	url := fmt.Sprintf("https://github.com/Webfax-Teletext/%s-Teletext/raw/refs/heads/main/P%s.tti", station, parts[0])
 	logFetchingPage(url)
 	resp, err := http.Get(url)
 	if err != nil {
-		return
+		return false
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
 		fmt.Println("HTTP Error: Could not retrieve page", pageNr, "Status:", resp.StatusCode)
-		return
+		return true
 	}
 
-	rows, nav := parseTTIRows(resp.Body, parts[0], parts[1], true) // parts[1] = subpagenumber
+	rows, nav := parseTTIRows(resp.Body, parts[0], parts[1], true)
 	ps, ns, ct := getPrevNextSubpage(parts[0], nav)
 
 	var output []byte
@@ -3014,54 +3181,25 @@ func webfax1GetTeletexPage(pageNr string) {
 	}
 
 	output = append(output, []byte("</pre>")...)
-	os.WriteFile(filepath.Join(DirWEBFAX1, pageNr), output, 0644)
+	savePage(dirStation, pageNr, output)
+	return true
 }
 
-func webfax2GetTeletexPage(pageNr string) {
-	parts := strings.Split(pageNr, "-")
-	url := fmt.Sprintf("https://github.com/Webfax-Teletext/Webfax2-Teletext/raw/refs/heads/main/P%s.tti", parts[0])
-	logFetchingPage(url)
-	resp, err := http.Get(url)
-	if err != nil {
-		return
-	}
-	defer resp.Body.Close()
+// --- SPARK ---
 
-	if resp.StatusCode != 200 {
-		fmt.Println("HTTP Error: Could not retrieve page", pageNr, "Status:", resp.StatusCode)
-		return
-	}
-
-	rows, nav := parseTTIRows(resp.Body, parts[0], parts[1], true) // parts[1] = subpagenumber
-	ps, ns, ct := getPrevNextSubpage(parts[0], nav)
-
-	var output []byte
-	output = append(output, []byte(fmt.Sprintf(
-		"pn=p_\npn=n_\n%v%v%vftl=%v-0\nftl=%v-0\nftl=%v-0\nftl=%v-0\n<pre>",
-		ps, ns, ct,
-		string(ftl[0]), string(ftl[1]), string(ftl[2]), string(ftl[3])))...)
-
-	for _, r := range rows {
-		output = append(output, r...)
-	}
-
-	output = append(output, []byte("</pre>")...)
-	os.WriteFile(filepath.Join(DirWEBFAX2, pageNr), output, 0644)
-}
-
-func sparkGetTeletexPage(pageNr string) {
+func sparkGetTeletexPage(pageNr string) bool {
 	parts := strings.Split(pageNr, "-")
 	url := fmt.Sprintf("https://raw.githubusercontent.com/spark-teletext/spark-teletext/master/P%s.tti", parts[0])
 	logFetchingPage(url)
 	resp, err := http.Get(url)
 	if err != nil {
-		return
+		return false
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
 		fmt.Println("HTTP Error: Could not retrieve page", pageNr, "Status:", resp.StatusCode)
-		return
+		return true
 	}
 
 	rows, nav := parseTTIRows(resp.Body, parts[0], parts[1], true) // parts[1] = subpagenumber
@@ -3078,7 +3216,8 @@ func sparkGetTeletexPage(pageNr string) {
 	}
 
 	output = append(output, []byte("</pre>")...)
-	os.WriteFile(filepath.Join(DirSPARK, pageNr), output, 0644)
+	savePage(DirSPARK, pageNr, output)
+	return true
 }
 
 // currently used by ceefax, teefax, zdf, svt
@@ -3351,13 +3490,7 @@ func getTeefaxURL(pageID string) (string, error) {
 
 // --- YLE TEKSTI-TV  ---
 
-func tekstiHandler(w http.ResponseWriter, r *http.Request) {
-	pageName := getPageName(r, DirTEKSTI)
-	tekstiGetTeletexPage(pageName)
-	writeResponse(w, DirTEKSTI, pageName)
-}
-
-func tekstiGetTeletexPage(pageNr string) {
+func tekstiGetTeletexPage(pageNr string) bool {
 	parts := strings.Split(pageNr, "-")
 	var rows [][]byte
 	var nav NavignationInfo
@@ -3395,13 +3528,13 @@ func tekstiGetTeletexPage(pageNr string) {
 		logFetchingPage(url)
 		resp, err := http.Get(url)
 		if err != nil {
-			return
+			return false
 		}
 		defer resp.Body.Close()
 
 		if resp.StatusCode != 200 {
 			fmt.Println("HTTP Error: Could not retrieve page", pageNr, "Status:", resp.StatusCode)
-			return
+			return true
 		}
 
 		if strings.HasPrefix(parts[1], "0") {
@@ -3411,7 +3544,7 @@ func tekstiGetTeletexPage(pageNr string) {
 		rows, nav, err = parseTEKSTIRows(resp.Body, parts[1]) // parts[1] = subpagenumber
 		if err != nil {
 			fmt.Println("xml.Unmarshal error")
-			return
+			return true
 		}
 	}
 	ps := ""
@@ -3435,7 +3568,8 @@ func tekstiGetTeletexPage(pageNr string) {
 	}
 
 	output = append(output, []byte("</pre>")...)
-	os.WriteFile(filepath.Join(DirTEKSTI, pageNr), output, 0644)
+	savePage(DirTEKSTI, pageNr, output)
+	return true
 }
 
 func parseTEKSTIRows(body io.ReadCloser, subpageStr string) ([][]byte, NavignationInfo, error) {
@@ -3624,25 +3758,19 @@ func encodeTekstiChar(r rune) byte {
 
 // --- DR TEKST-TV ---
 
-func drteksttvHandler(w http.ResponseWriter, r *http.Request) {
-	pageName := getPageName(r, DirDR)
-	drteksttvGetTeletexPage(pageName)
-	writeResponse(w, DirDR, pageName)
-}
-
-func drteksttvGetTeletexPage(pageNr string) {
+func drteksttvGetTeletexPage(pageNr string) bool {
 	parts := strings.Split(pageNr, "-")
 	url := fmt.Sprintf("https://www.dr.dk/cgi-bin/fttx1.exe/%s/%s", parts[0], parts[1])
 	logFetchingPage(url)
 	resp, err := http.Get(url)
 	if err != nil {
-		return
+		return false
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
 		fmt.Println("HTTP Error: Could not retrieve page", pageNr, "Status:", resp.StatusCode)
-		return
+		return true
 	}
 
 	row0 := make([]byte, 40)
@@ -3653,7 +3781,7 @@ func drteksttvGetTeletexPage(pageNr string) {
 	rows, nav, err := parseDRRows(resp.Body, parts[0], parts[1])
 	if err != nil {
 		fmt.Println(err.Error())
-		return
+		return true
 	}
 
 	pp := ""
@@ -3682,7 +3810,8 @@ func drteksttvGetTeletexPage(pageNr string) {
 	}
 
 	output = append(output, []byte("</pre>")...)
-	os.WriteFile(filepath.Join(DirDR, pageNr), output, 0644)
+	savePage(DirDR, pageNr, output)
+	return true
 }
 
 func parseDRRows(body io.ReadCloser, pageNr string, subPageNr string) ([][]byte, NavignationInfo, error) {

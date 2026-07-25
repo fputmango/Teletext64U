@@ -8,9 +8,12 @@
 |+| Go to current page +1 / next page|
 |-| Go to current page -1 / previous page|
 |↑| Step back through visited pages|
-|←| Go back to the WiC64 Portal|
-|UP | Subpage up |
-|DN | Subpage down |
+|←| Go back to the WiC64 Portal (only supported in the standalone WiC64 PRG version)|
+|Cursor Up | Subpage up |
+|Cursor Down | Subpage down |
+|Cursor Left | Highlight previous page link |
+|Cursor Right | Highlight next page link |
+|RETURN | Select and go to page link |
 |R | Refresh current teletext page |
 |Space | Stop/Continue auto rotating subpages |
 |B | Bold font |
@@ -23,9 +26,11 @@
 |F5 | Fastext yellow |
 |F7 | Fastext cyan |
 |F8 | Help screen |
-|C= + S | Stopwatch ON/OFF toggle - measures total time needed for network request, decode & rendering page on screen. Expressed injiffies (60 jiffies = 1 second) |
+|C= + S | Stopwatch ON/OFF toggle - measures total time needed for network request, decode & rendering page on screen. Expressed in jiffies (60 jiffies = 1 second) |
 
 ## Config utility
+Note: This is a separate program, available only with the disk and D64 versions. The standalone WiC64 PRG version includes a built-in configuration screen.
+
 With this program you configure:
 - If you want to use the public petsciiproxy.nl server or run a local server.
 - IP-address and port of the machine where PetsciiProxy is running.

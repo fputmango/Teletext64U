@@ -4,8 +4,7 @@ Teletext program showing live pages from the internet for the Commodore 64 Ultim
 
 The program also runs on an original stock C64/C128 in C64 mode with a WiC64 or an Ultimate II+ cartridge.
 
-### Great news!
-Teletext 64 Ultimate has its own dedicated server at petsciiproxy.nl, so you no longer need to run a local server. The WiC64 version is now available in the WiC Portal and also runs in the VICE emulator!
+Teletext 64 Ultimate has its own dedicated server at petsciiproxy.nl, so you don't need to run a local server. The WiC64 version is now available in the WiC Portal and also runs in the VICE emulator!
 
 ### Currently supporting:
 
@@ -52,6 +51,7 @@ Although the C64U has excellent networking capabilities, it unfortunately is res
 - Set your favorite teletext station and start page with the config utility.
 - Double height text, blinking text, hidden/concealed text that can be revealed.
 - Auto rotating subpages with a configurable cycle time.
+- **Quick navigation** – Using only the cursor keys, RETURN, and the ↑ key, all located together on the right side of the C64 keyboard, you can quickly move back and forth through pages without having to enter page numbers.
 
 ## Tools used for this project
 - Xcode, CC65, Visual Studio Code, CharPad 
