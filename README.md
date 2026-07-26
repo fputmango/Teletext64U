@@ -29,6 +29,7 @@ Teletext 64 Ultimate has its own dedicated server at petsciiproxy.nl, so you don
 |Webfax 1 |UK |
 |Webfax 2 |UK |
 |SPARK TVARK teletext |UK |
+|WDR Text |Germany |
 
 My mission: add as many Teletext services as possible. So let me know if you have any wishes.
 

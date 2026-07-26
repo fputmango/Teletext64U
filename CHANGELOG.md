@@ -1,5 +1,11 @@
 # **Teletext64U** changelog
 
+## [2.3.0] - 2026-07-26
+
+### Added
+- New station: WDR-Text (Germany). If a page has subpages there will be an indicator bottom right. For some reason WDR doesn't include this within the teletext page itself.
+
+
 ## [2.2.0] - 2026-07-25
 
 ### Added Teletext64U

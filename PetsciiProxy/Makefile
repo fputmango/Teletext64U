@@ -1,5 +1,8 @@
 BINARY_NAME=petsciiproxy
 
+dev:	
+	GOOS=darwin GOARCH=arm64 go build -o ./dist/${BINARY_NAME}-mac-silicon .
+
 build:	
 	GOOS=darwin GOARCH=arm64 go build -o ./dist/${BINARY_NAME}-mac-silicon .
 	GOOS=darwin GOARCH=amd64 go build -o ./dist/${BINARY_NAME}-mac-intel .
