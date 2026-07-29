@@ -19,7 +19,7 @@
 |B | Bold font |
 |T | Thin font |
 |S | Switch station (carousel) |
-|M | Switch station (menu list) - Navigatge: cursor up/down or type first letter for quick select; RETURN selects station |
+|M | Switch station (menu list) - Navigatge: cursor left/right, up/down or type first letter for quick select; RETURN selects station |
 |C | Shows/hides concealed text |
 |F1 | Fastext red |
 |F3 | Fastext green |

@@ -97,7 +97,7 @@ import (
 )
 
 // Version
-const pp_version = "2.3.0"
+const pp_version = "2.3.1"
 
 // Supported teletext services
 const (

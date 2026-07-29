@@ -1,5 +1,14 @@
 # **Teletext64U** changelog
 
+## [2.3.1] - 2026-07-29
+
+### Changed
+- The station menu (M) now has two columns, providing room for many more stations in the future. Teletext stations are grouped by language. Currently, there are three groups: German, English, and Other. This menu layout has also been applied to the CONFIG program and the standalone WiC64 edition (accessible via F2).
+
+### Added
+- Support for the û. First noticed when Dutch NOS-TT used it in 'skûtsje' (Frisian language)
+
+
 ## [2.3.0] - 2026-07-26
 
 ### Added
