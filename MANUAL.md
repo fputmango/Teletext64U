@@ -9,16 +9,15 @@
 |-| Go to current page -1 / previous page|
 |↑| Step back through visited pages|
 |←| Go back to the WiC64 Portal (only supported in the standalone WiC64 PRG version)|
-|Cursor Up | Subpage up |
-|Cursor Down | Subpage down |
-|Cursor Left | Highlight previous page link |
-|Cursor Right | Highlight next page link |
-|RETURN | Select and go to page link |
+|, | Subpage up |
+|. | Subpage down |
+|Cursor keys/WASD | Quick Navgiation |
+|RETURN/E | Select and go to pagenumber |
 |R | Refresh current teletext page |
 |Space | Stop/Continue auto rotating subpages |
 |B | Bold font |
 |T | Thin font |
-|S | Switch station (carousel) |
+|/ | Switch station (carousel) |
 |M | Switch station (menu list) - Navigatge: cursor left/right, up/down or type first letter for quick select; RETURN selects station |
 |C | Shows/hides concealed text |
 |F1 | Fastext red |

@@ -1,5 +1,27 @@
 # **Teletext64U** changelog
 
+## [2.4.0] - 2026-08-03
+
+### Added
+New stations:
+- hr-text / Hessischer Rundfunk (Germany)
+- SWR Baden-Württemberg (Germany)
+- SWR Rheinland-Pfalz (Germany)
+- SRF 1 (Switzerland, German)
+- SRF zwei (Switserland, German)
+- SRF info (Switserland, German)
+- RTS 1 (Switserland, French)
+- RTS 2 (Switserland, French)
+- RSI LA 1 (Switserland, Italian)
+- RSI LA 2 (Switserland, Italian)
+
+### Changed
+- All the cursor keys are now used for Quick page link navigation. You can also use WASD. Pressing E will bring you to the highlighted pagenumber, if available. Q takes you back were you came from.
+- The , and . keys are now used for stepping through subpages. 
+- The / key is now used for changing stations carousel style.
+- Help screen is updated. 
+
+
 ## [2.3.1] - 2026-07-29
 
 ### Changed

@@ -25,12 +25,15 @@ Supported teletext services:
 - ORF 1, ORF 2, ORF III, ORF Sport+ (Austria)
 - Chunkytext (UK)
 - Webfax 1 & Webfax 1 (UK)
-- SPARK
+- SPARK (UK)
+- WDR text (German)
+- hr-text (German)
+- SWR BW (German, Baden-Württemberg)
+- SWR RP (German, Rheinland-Pfalz)
+- SRF 1, zwei, SRF Info, RTS Un, RTS Deux, RSI LA 1, RSI LA 2 (Switzerland, German/French/Italian)
 
 Next up candidates:
-- WDR text: https://mobiltext.wdr.de/%s.html
 - RTP teletexto (Portugal) - https://www.rtp.pt/wportal/fab-txt/texto/100/100_0001.htm
-- HR-text (German) https://www.hr-text.hr-fernsehen.de/ttxweb/?page=100
 - ...?
 
 The NOS-TT file format is being used for the other teletext services:
@@ -72,6 +75,8 @@ import (
 	"bufio"
 	"bytes"
 	"crypto/tls"
+	"encoding/base64"
+	"encoding/json"
 	"encoding/xml"
 	"errors"
 	"flag"
@@ -97,7 +102,7 @@ import (
 )
 
 // Version
-const pp_version = "2.3.1"
+const pp_version = "2.4.0"
 
 // Supported teletext services
 const (
@@ -112,6 +117,9 @@ const (
 	DirORF2       = "ORF2"
 	DirORF3       = "ORF3"
 	DirORFSport   = "ORFSPORT"
+	DirHR         = "HR-TEXT"
+	DirSWRBW      = "SWR-BW"
+	DirSWRRP      = "SWR-RP"
 	DirCEEFAX     = "CEEFAX"
 	DirTEEFAX     = "TEEFAX"
 	DirTEKSTI     = "TEKSTI-TV"
@@ -121,7 +129,14 @@ const (
 	DirWEBFAX1    = "WEBFAX1"
 	DirWEBFAX2    = "WEBFAX2"
 	DirSPARK      = "SPARK"
-	DirUD         = "UD"
+	DirSRF1       = "SRF1"
+	DirSRF2       = "SRF2"
+	DirSRFInfo    = "SRFINFO"
+	DirRTS1       = "RTS1"
+	DirRTS2       = "RTS2"
+	DirRSILA1     = "RSILA1"
+	DirRSILA2     = "RSILA2"
+	DirUD         = "UD" // User Directory where user preferences are stored for the stand alone WiC64 edition
 )
 
 // Chunkeytext
@@ -137,6 +152,9 @@ var handlers = map[string]http.HandlerFunc{
 	DirZDFneo:     makeHandler(DirZDFneo, func(p string) bool { return zdftextGetTeletexPage(p, "zdfneo", DirZDFneo) }),
 	Dir3sat:       makeHandler(Dir3sat, func(p string) bool { return zdftextGetTeletexPage(p, "3sat", Dir3sat) }),
 	DirWDR:        makeHandler(DirWDR, wdrtextGetTeletexPage),
+	DirHR:         makeHandler(DirHR, hrtextGetTeletexPage),
+	DirSWRBW:      makeHandler(DirSWRBW, func(p string) bool { return swrGetTeletexPage(p, "bw", DirSWRBW) }),
+	DirSWRRP:      makeHandler(DirSWRRP, func(p string) bool { return swrGetTeletexPage(p, "rp", DirSWRRP) }),
 	DirORF1:       makeHandler(DirORF1, func(p string) bool { return orfGetTeletexPage(p, "orf1", DirORF1) }),
 	DirORF2:       makeHandler(DirORF2, func(p string) bool { return orfGetTeletexPage(p, "orf2", DirORF2) }),
 	DirORF3:       makeHandler(DirORF3, func(p string) bool { return orfGetTeletexPage(p, "orfiii", DirORF3) }),
@@ -150,6 +168,13 @@ var handlers = map[string]http.HandlerFunc{
 	DirTEKSTI:     makeHandler(DirTEKSTI, tekstiGetTeletexPage),
 	DirSVT:        makeHandler(DirSVT, svttextGetTeletexPage),
 	DirDR:         makeHandler(DirDR, drteksttvGetTeletexPage),
+	DirSRF1:       makeHandler(DirSRF1, func(p string) bool { return srgGetTeletexPage(p, "SRF1", DirSRF1) }),
+	DirSRF2:       makeHandler(DirSRF2, func(p string) bool { return srgGetTeletexPage(p, "SRFzwei", DirSRF2) }),
+	DirSRFInfo:    makeHandler(DirSRFInfo, func(p string) bool { return srgGetTeletexPage(p, "SRFInfo", DirSRFInfo) }),
+	DirRTS1:       makeHandler(DirRTS1, func(p string) bool { return srgGetTeletexPage(p, "RTSUn", DirRTS1) }),
+	DirRTS2:       makeHandler(DirRTS2, func(p string) bool { return srgGetTeletexPage(p, "RTSDeux", DirRTS2) }),
+	DirRSILA1:     makeHandler(DirRSILA1, func(p string) bool { return srgGetTeletexPage(p, "RSILA1", DirRSILA1) }),
+	DirRSILA2:     makeHandler(DirRSILA2, func(p string) bool { return srgGetTeletexPage(p, "RSILA2", DirRSILA2) }),
 }
 
 var chunkytextMutex sync.RWMutex
@@ -268,10 +293,7 @@ var ardColorMap = map[string]byte{
 	"w":  7, // white
 }
 
-// END ARD Text
-
 // TEKSTI-TV: XML based
-
 // gets filled with command line parameter
 var tekstiAPIkey string = ""
 
@@ -484,7 +506,7 @@ If you do not have one, you can request one here: https://developer.yle.fi/en/in
 	}
 
 	// Create UD folder (=User Data) for user config storage and register handler
-	// WiC64 firmware v2.1.0 uppercases the URL path, so register both cases
+	// WiC64 firmware v2.1.0 uppercases the URL path, so we register both cases
 	err = os.MkdirAll(DirUD, 0755)
 	if err != nil {
 		fmt.Printf("Could not create folder %s: %v\n", DirUD, err)
@@ -646,6 +668,8 @@ func makeHandler(dirStation string, fetch fetchFunc) http.HandlerFunc {
 }
 
 // --- NOS Teletekst ---
+
+// doesn't need a parser function because we get the data in raw teletext binary
 
 func nosttGetTeletexPage(pageNr string) bool {
 	urlData := fmt.Sprintf("https://teletekst-data.nos.nl/page/%s", pageNr)
@@ -2364,6 +2388,7 @@ func parseORFRows(body io.Reader, station string, pageNr string) ([][]byte, Navi
 }
 
 // --- WDR Text ---
+
 func wdrtextGetTeletexPage(pageNr string) bool {
 	var url string
 	parts := strings.Split(pageNr, "-")
@@ -2820,6 +2845,1188 @@ func parseWDRRows(body io.Reader, pageNr string, subpageStr string) ([][]byte, N
 	}
 
 	return pageBuffer, nav, ftl, nil
+}
+
+// --- hr-text ---
+
+func hrtextGetTeletexPage(pageNr string) bool {
+	var url string
+	parts := strings.Split(pageNr, "-")
+	subPage, _ := strconv.Atoi(parts[1])
+
+	if subPage < 2 {
+		url = fmt.Sprintf("https://www.hr-text.hr-fernsehen.de/ttxweb/?page=%s&xhr=1", parts[0])
+	} else {
+		subStr := strconv.Itoa(subPage)
+		url = fmt.Sprintf("https://www.hr-text.hr-fernsehen.de/ttxweb/?page=%s&sub=%s&xhr=1", parts[0], subStr)
+	}
+
+	logFetchingPage(url)
+	resp, err := http.Get(url)
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		fmt.Println("HTTP Error: Could not retrieve page", pageNr, "Status:", resp.StatusCode)
+		return true
+	}
+
+	var nav NavignationInfo
+	rows, nav := parseHRRows(resp.Body, parts[0], parts[1])
+	if err != nil {
+		fmt.Println("hr-text page not found:", pageNr, "-", err)
+		return true
+	}
+
+	// Optional directives for (sub)page navigation
+	pp := ""
+	np := ""
+	ps := ""
+	ns := ""
+	ct := ""
+	currentPage = parts[0]
+
+	if nav.numberOfSubpages > 1 {
+		ps, ns, ct = getPrevNextSubpage(parts[0], nav)
+	}
+
+	if nav.prevPage > 0 {
+		pp = "pn=p_" + strconv.Itoa(nav.prevPage) + "-1\n"
+	}
+	if nav.nextPage > 0 {
+		np = "pn=n_" + strconv.Itoa(nav.nextPage) + "-1\n"
+	}
+	var ftl FastextLinks
+	ftl.ftl1 = "102-0"
+	ftl.ftl2 = "112-0"
+	ftl.ftl3 = "170-0"
+	ftl.ftl4 = "200-0"
+
+	var output []byte
+	output = append(output, []byte(fmt.Sprintf(
+		"%v%v%v%v%vftl=%v\nftl=%v\nftl=%v\nftl=%v\n<pre>", pp, np, ps, ns, ct, ftl.ftl1, ftl.ftl2, ftl.ftl3, ftl.ftl4))...)
+
+	row0 := make([]byte, 40)
+	for i := range row0 {
+		row0[i] = 0x20
+	}
+	dt := getORFDate() // yes reuse ORF date here, because why not?
+	stationPage := "\x06hr-text\x07"
+
+	copy(row0[19:], stringToLatin1Bytes(dt))
+	copy(row0[11:], []byte(stationPage))
+	row0[31] = 0x06
+
+	row24 := make([]byte, 40)
+	for i := range row0 {
+		row24[i] = 0x20
+	}
+	copy(row24[0:], "\x01Inhalt A-Z \x02Nachrichten  \x03Wetter \x06Sport")
+
+	copy(rows[24], row24)
+
+	output = append(output, row0...)
+	for _, r := range rows[1:] {
+		output = append(output, r...)
+	}
+
+	output = append(output, []byte("</pre>")...)
+
+	savePage(DirHR, pageNr, output)
+	return true
+}
+
+// --- SWR Baden-Württemberg & Rheinland-Pfalz ---
+
+func swrGetTeletexPage(pageNr string, station string, dirStation string) bool {
+	var url string
+	parts := strings.Split(pageNr, "-")
+	subPage, _ := strconv.Atoi(parts[1])
+
+	if subPage < 2 {
+		url = fmt.Sprintf("https://wraps.swr.de/videotext/?stream=%s&page=%s&xhr=1", station, parts[0])
+	} else {
+		subStr := strconv.Itoa(subPage)
+		url = fmt.Sprintf("https://wraps.swr.de/videotext/?stream=%s&page=%s&sub=%s&xhr=1", station, parts[0], subStr)
+	}
+
+	logFetchingPage(url)
+	resp, err := http.Get(url)
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		fmt.Println("HTTP Error: Could not retrieve page", pageNr, "Status:", resp.StatusCode)
+		return true
+	}
+
+	var nav NavignationInfo
+
+	rows, nav := parseHRRows(resp.Body, parts[0], parts[1])
+	if err != nil {
+		fmt.Println("Page not found:", pageNr, "-", err)
+		return true
+	}
+
+	// Optional directives for (sub)page navigation
+	pp := ""
+	np := ""
+	ps := ""
+	ns := ""
+	ct := ""
+	currentPage = parts[0]
+
+	if nav.numberOfSubpages > 1 {
+		ps, ns, ct = getPrevNextSubpage(parts[0], nav)
+	}
+
+	if nav.prevPage > 0 {
+		pp = "pn=p_" + strconv.Itoa(nav.prevPage) + "-1\n"
+	}
+	if nav.nextPage > 0 {
+		np = "pn=n_" + strconv.Itoa(nav.nextPage) + "-1\n"
+	}
+
+	var ftl FastextLinks
+	ftl.ftl1 = "101-0"
+	ftl.ftl2 = "112-0"
+	ftl.ftl3 = "151-0"
+	ftl.ftl4 = "200-0"
+
+	var output []byte
+	output = append(output, []byte(fmt.Sprintf(
+		"%v%v%v%v%vftl=%v\nftl=%v\nftl=%v\nftl=%v\n<pre>", pp, np, ps, ns, ct, ftl.ftl1, ftl.ftl2, ftl.ftl3, ftl.ftl4))...)
+
+	row0 := make([]byte, 40)
+	for i := range row0 {
+		row0[i] = 0x20
+	}
+	dt := getORFDate() // yes reuse ORF date here, because why not?
+	var stationPage string
+	if station == "bw" {
+		stationPage = "\x02SWR BW \x03"
+	} else {
+		stationPage = "\x02SWR RLP\x03"
+	}
+
+	copy(row0[19:], stringToLatin1Bytes(dt))
+	copy(row0[1:], []byte(stationPage))
+	row0[19] = row0[20]
+	row0[20] = row0[21]
+	row0[21] = ','
+	row0[31] = 0x07
+
+	row24 := make([]byte, 40)
+	for i := range row0 {
+		row24[i] = 0x20
+	}
+	copy(row24[0:], "\x01\xDCberblick  \x02Nachrichten \x03Wetter  \x06Sport")
+
+	copy(rows[24], row24)
+
+	output = append(output, row0...)
+	for _, r := range rows[1:] {
+		output = append(output, r...)
+	}
+
+	output = append(output, []byte("</pre>")...)
+
+	savePage(dirStation, pageNr, output)
+	return true
+}
+
+/*
+// hr-text runs on the ttxweb engine (https://github.com/fabianswebworld/ttxweb).
+// Each row is rendered as <pre class="ttxRow" id="rowN">...</pre> containing nested
+// <span> runs. A run's class carries the active colours as "bgX" (background) and/or
+// "fgX" (foreground), where X is 0-7 and lines up 1:1 with our TCC_ALPHA_* codes
+// (black=0 .. white=7). A single mosaic/graphics cell is its own leaf span with class
+// "g1cDXX": D is the (redundant) foreground colour digit and XX is the hex teletext
+// G1 character code, e.g. class="g1c47c" = blue (4) mosaic character 0x7c.
+// Navigation info sits outside the page in plain <pre id="ttxPrevPageNum">..</pre>
+// style elements inside the (hidden) #ttxEnv block.
+var hrRowRe = regexp.MustCompile(`^row(\d+)$`)
+var hrBgRe = regexp.MustCompile(`^bg([0-7])$`)
+var hrFgRe = regexp.MustCompile(`^fg([0-7])$`)
+var hrMosaicRe = regexp.MustCompile(`^g1c([0-7])([0-9a-fA-F]{2})$`)
+
+func parseHRRows(body io.Reader, pageNr string, subpageStr string) ([][]byte, NavignationInfo) {
+	var nav NavignationInfo
+
+	// Initialize buffer with 25 rows, 40 spaces each
+	pageBuffer := make([][]byte, 25)
+	for i := range pageBuffer {
+		line := make([]byte, 40)
+		for j := range line {
+			line[j] = 0x20
+		}
+		pageBuffer[i] = line
+	}
+
+	z := html.NewTokenizer(body)
+
+	currentRow := -1
+	currentCol := 0
+	prevFg := byte(TCC_ALPHA_WHITE)
+	prevBg := byte(TCC_ALPHA_BLACK)
+	pendingFg := byte(TCC_ALPHA_WHITE)
+	declaredBg := byte(TCC_ALPHA_BLACK)
+	pendingBlanks := 0
+	zoneBlanks := 0
+	skipNextText := false
+
+	resetRowState := func() {
+		currentCol = 0
+		prevFg = TCC_ALPHA_WHITE
+		prevBg = TCC_ALPHA_BLACK
+		pendingFg = TCC_ALPHA_WHITE
+		declaredBg = TCC_ALPHA_BLACK
+		pendingBlanks = 0
+		zoneBlanks = 0
+		skipNextText = false
+	}
+
+	writeCurrent := func(b byte) {
+		writeToBuffer(pageBuffer, &currentRow, &currentCol, b)
+	}
+
+	// hr-text's HTML doesn't reserve a screen cell for colour-change control
+	// codes the way raw teletext data does, so a run of blank cells (nbsp or
+	// plain space) is deferred instead of written immediately. Once real
+	// content (a text character or a mosaic cell) needs to be drawn, any
+	// pending colour change is committed using the LAST cells of that
+	// deferred run: a genuine left margin/padding run stays blank, and the
+	// control code(s) land immediately in front of the content they apply to.
+	// If there aren't enough deferred blanks nearby - e.g. a colour change in
+	// the middle of an unbroken run of mosaic cells - the remaining code
+	// byte(s) simply spend a fresh column instead. An earlier version tried
+	// to claw that column back from whatever blanks turned up later in the
+	// row, but that silently ate genuine spacing (like the gap between two
+	// pieces of real text) to pay for it, which is worse than the column
+	// loss it was fixing.
+	commitPending := func(codes []byte) {
+		blanksToFlush := pendingBlanks - len(codes)
+		if blanksToFlush < 0 {
+			blanksToFlush = 0
+		}
+		for i := 0; i < blanksToFlush; i++ {
+			writeCurrent(0x20)
+		}
+		pendingBlanks -= blanksToFlush
+		for _, c := range codes {
+			writeCurrent(c)
+			if pendingBlanks > 0 {
+				pendingBlanks--
+			}
+		}
+	}
+
+	// commitBgIfPending applies a still-unapplied background change. A blank
+	// cell's background is visible on screen (it renders as a colour-filled
+	// box), so a background run that's entirely blank - like a coloured strip
+	// between two pieces of text - still needs its own control code right
+	// where it starts; it can't be left deferred all the way to the next bit
+	// of real text the way foreground can, or a later background declaration
+	// would silently overwrite it before it was ever placed.
+	//
+	// Blanks accumulated while a new background is declared but not yet
+	// applied go into zoneBlanks rather than pendingBlanks, since they'll
+	// render in the NEW colour and must never be flushed as if they were
+	// old-colour filler. If pendingBlanks (the old-colour run right before
+	// this change) is too small to hold the 2-byte code by itself, cells are
+	// borrowed from the front of zoneBlanks to complete it - those cells were
+	// always going to be in the new colour anyway, so using one of them to
+	// hold the code instead of a blank costs nothing.
+	commitBgIfPending := func() {
+		if declaredBg == prevBg {
+			return
+		}
+		const needed = 2 // colour code + NEW_BACKGROUND
+		if pendingBlanks < needed {
+			borrow := needed - pendingBlanks
+			if borrow > zoneBlanks {
+				borrow = zoneBlanks
+			}
+			pendingBlanks += borrow
+			zoneBlanks -= borrow
+		}
+		commitPending([]byte{declaredBg, TCC_NEW_BACKGROUND})
+		prevBg = declaredBg
+		prevFg = declaredBg
+		pendingBlanks += zoneBlanks
+		zoneBlanks = 0
+	}
+
+	// resolvePending first settles any still-pending background change, then
+	// decides which foreground colour code (if any) is needed to move from
+	// the last committed fg to the currently declared (pending) one, and
+	// hands it to commitPending. Called right before any real content is
+	// drawn - either a mosaic cell, or the first non-blank text token
+	// following a run of filler spans - so codes always land immediately in
+	// front of the content they colour, not buried inside it.
+	resolvePending := func(isMosaic bool, mosaicColorDigit byte) {
+		commitBgIfPending()
+		desiredFg := pendingFg
+		if isMosaic {
+			desiredFg = mosaicColorDigit + TCC_MOSAIC_BLACK
+		}
+		var codes []byte
+		if desiredFg != prevFg {
+			codes = append(codes, desiredFg)
+			prevFg = desiredFg
+		}
+		commitPending(codes)
+	}
+
+	writeReal := func(b byte, isMosaic bool, mosaicColorDigit byte) {
+		// If this is the last free column in the row, a colour-change code
+		// would land there instead of the character it's meant to colour -
+		// the code would "succeed" but leave nothing after it to show for
+		// it, while the actual character silently falls off the row. Better
+		// to draw the character itself, even in a stale colour, than spend
+		// the final column on an invisible control code.
+		if currentCol < 39 {
+			resolvePending(isMosaic, mosaicColorDigit)
+		}
+		writeCurrent(b)
+	}
+
+	navField := ""
+	currentSubpage := 0
+	numSubpages := 0
+
+	for {
+		tt := z.Next()
+		if tt == html.ErrorToken {
+			break
+		}
+
+		token := z.Token()
+
+		switch tt {
+		case html.StartTagToken, html.SelfClosingTagToken:
+			switch token.Data {
+
+			case "pre":
+				var idVal string
+				for _, attr := range token.Attr {
+					if attr.Key == "id" {
+						idVal = attr.Val
+						break
+					}
+				}
+
+				navField = ""
+				switch idVal {
+				case "ttxPrevPageNum":
+					navField = "prev"
+				case "ttxNextPageNum":
+					navField = "next"
+				case "ttxSubpageNum":
+					navField = "sub"
+				case "ttxNumSubpages":
+					navField = "numsub"
+				default:
+					if m := hrRowRe.FindStringSubmatch(idVal); m != nil {
+						n, err := strconv.Atoi(m[1])
+						if err == nil {
+							currentRow = n
+							resetRowState()
+						}
+					}
+				}
+
+			case "span":
+				if currentRow < 0 || currentRow > 24 {
+					continue
+				}
+
+				var classVal string
+				for _, attr := range token.Attr {
+					if attr.Key == "class" {
+						classVal = attr.Val
+						break
+					}
+				}
+				if classVal == "" {
+					continue
+				}
+
+				// A single mosaic character cell, e.g. class="g1c47c".
+				if m := hrMosaicRe.FindStringSubmatch(classVal); m != nil {
+					colorDigit := byte(mustAtoi(m[1]))
+					if hexVal, err := strconv.ParseUint(m[2], 16, 8); err == nil {
+						writeReal(byte(hexVal)+0x80, true, colorDigit)
+					}
+					skipNextText = true
+					continue
+				}
+
+				for _, class := range strings.Fields(classVal) {
+					if m := hrBgRe.FindStringSubmatch(class); m != nil {
+						newBg := byte(mustAtoi(m[1]))
+						if newBg != declaredBg {
+							commitBgIfPending()
+							declaredBg = newBg
+							zoneBlanks = 0
+						}
+						continue
+					}
+					if m := hrFgRe.FindStringSubmatch(class); m != nil {
+						pendingFg = byte(mustAtoi(m[1]))
+					}
+				}
+			}
+
+		case html.EndTagToken:
+			if token.Data == "pre" {
+				currentRow = -1
+			}
+
+		case html.TextToken:
+			text := token.Data
+
+			if navField != "" {
+				if val, err := strconv.Atoi(strings.TrimSpace(text)); err == nil {
+					switch navField {
+					case "prev":
+						nav.prevPage = val
+					case "next":
+						nav.nextPage = val
+					case "sub":
+						currentSubpage = val
+					case "numsub":
+						numSubpages = val
+					}
+				}
+				navField = ""
+				continue
+			}
+
+			if currentRow < 0 || currentRow > 24 || skipNextText {
+				skipNextText = false
+				continue
+			}
+
+			// A text node that carries real (non-blank) content settles any
+			// colour change pending from earlier, purely-blank filler spans
+			// right now - before its own leading blanks (if any) get added to
+			// the pool. Otherwise those leading blanks would merge with the
+			// filler pool and let a later flush push the colour codes past
+			// them, landing right before the real text instead of in front of
+			// the whole run. A text node that's blank through and through is
+			// itself filler, so it's simply added to the pool as before.
+			hasReal := false
+			for _, r := range text {
+				if r == ' ' || r == ' ' || r == '\n' || r == '\r' || r == '\t' {
+					continue
+				}
+				hasReal = true
+				break
+			}
+			if hasReal {
+				resolvePending(false, 0)
+			}
+
+			for _, r := range text {
+				if currentCol >= 40 {
+					break
+				}
+				switch {
+				case r == ' ':
+					if declaredBg != prevBg {
+						zoneBlanks++
+					} else {
+						pendingBlanks++
+					}
+				case r == ' ':
+					if declaredBg != prevBg {
+						zoneBlanks++
+					} else {
+						pendingBlanks++
+					}
+				case r == '\n' || r == '\r' || r == '\t':
+					// pretty-printed HTML whitespace, not real page content
+				default:
+					writeReal(zdfEncodeChar(r), false, 0)
+				}
+			}
+		}
+	}
+
+	nav.numberOfSubpages = numSubpages
+	if currentSubpage > 1 {
+		nav.prevSubpage = currentSubpage - 1
+	}
+	if numSubpages == 0 || currentSubpage < numSubpages {
+		nav.nextSubpage = currentSubpage + 1
+	}
+
+	return pageBuffer, nav
+}
+*/
+
+// hr-text runs on the ttxweb engine (https://github.com/fabianswebworld/ttxweb).
+// Each row is rendered as <pre class="ttxRow" id="rowN">...</pre> containing nested
+// <span> runs. A run's class carries the active colours as "bgX" (background) and/or
+// "fgX" (foreground), where X is 0-7 and lines up 1:1 with our TCC_ALPHA_* codes
+// (black=0 .. white=7). A single mosaic/graphics cell is its own leaf span with class
+// "g1cDXX": D is the (redundant) foreground colour digit and XX is the hex teletext
+// G1 character code, e.g. class="g1c47c" = blue (4) mosaic character 0x7c.
+// Navigation info sits outside the page in plain <pre id="ttxPrevPageNum">..</pre>
+// style elements inside the (hidden) #ttxEnv block.
+var hrRowRe = regexp.MustCompile(`^row(\d+)$`)
+var hrBgRe = regexp.MustCompile(`^bg([0-7])$`)
+var hrFgRe = regexp.MustCompile(`^fg([0-7])$`)
+var hrMosaicRe = regexp.MustCompile(`^g1([cs])([0-7])([0-9a-fA-F]{2})$`)
+
+func parseHRRows(body io.Reader, pageNr string, subpageStr string) ([][]byte, NavignationInfo) {
+	var nav NavignationInfo
+
+	// Initialize buffer with 25 rows, 40 spaces each
+	pageBuffer := make([][]byte, 25)
+	for i := range pageBuffer {
+		line := make([]byte, 40)
+		for j := range line {
+			line[j] = 0x20
+		}
+		pageBuffer[i] = line
+	}
+
+	z := html.NewTokenizer(body)
+
+	currentRow := -1
+	currentCol := 0
+	prevFg := byte(TCC_ALPHA_WHITE)
+	prevBg := byte(TCC_ALPHA_BLACK)
+	pendingFg := byte(TCC_ALPHA_WHITE)
+	declaredBg := byte(TCC_ALPHA_BLACK)
+	pendingBlanks := 0
+	zoneBlanks := 0
+	skipNextText := false
+	// pendingDH/prevDH mirror the pendingFg/prevFg pair but for double
+	// height: hr-text re-declares the full current attribute set (bg, fg,
+	// size, ...) on every span that actually changes something, so the
+	// presence or absence of the "dh" class token on a given span is the
+	// ground truth for whether double height is on at that point, not just
+	// something to notice when "dh" appears.
+	pendingDH := false
+	prevDH := false
+
+	// Hold-graphics state, mirroring the C64 client's pp_hold_graphic /
+	// pp_held_char / pp_is_graphics_mode / pp_is_sep_mosaic exactly, so we
+	// can reason about what each byte we emit will actually render as. The
+	// client only updates pp_held_char (and applies the sep/contiguous
+	// offset) when the byte it receives is a raw, un-offset pattern byte
+	// (0x20-0x3F/0x60-0x7F) - so mosaic pattern bytes are sent raw here,
+	// never pre-offset, or hold has nothing valid to echo.
+	heldPattern := byte(0x20)   // matches client's pp_held_char default
+	prevMosaicMode := byte('c') // mirrors pp_is_sep_mosaic (false = 'c' by default)
+	pendingMosaicRepeats := 0
+	holdActive := false   // pp_hold_graphic
+	graphicsMode := false // pp_is_graphics_mode
+
+	resetRowState := func() {
+		currentCol = 0
+		prevFg = TCC_ALPHA_WHITE
+		prevBg = TCC_ALPHA_BLACK
+		pendingFg = TCC_ALPHA_WHITE
+		declaredBg = TCC_ALPHA_BLACK
+		pendingBlanks = 0
+		zoneBlanks = 0
+		skipNextText = false
+		pendingDH = false
+		prevDH = false
+		heldPattern = 0x20
+		prevMosaicMode = 'c'
+		pendingMosaicRepeats = 0
+		holdActive = false
+		graphicsMode = false
+	}
+
+	writeCurrent := func(b byte) {
+		writeToBuffer(pageBuffer, &currentRow, &currentCol, b)
+	}
+
+	// flushPendingMosaicRepeats writes out any mosaic pattern repeats still
+	// deferred at the point a row ends (either because a new <pre id="rowN">
+	// starts, or because the document itself ends) - nothing else is left
+	// in the row to trigger resolvePending and cash them in, so without
+	// this the trailing run of identical cells would simply never be
+	// written at all, leaving the tail of the row blank instead of showing
+	// the pattern.
+	flushPendingMosaicRepeats := func() {
+		for i := 0; i < pendingMosaicRepeats; i++ {
+			writeCurrent(heldPattern)
+		}
+		pendingMosaicRepeats = 0
+	}
+
+	// hr-text's HTML doesn't reserve a screen cell for colour-change control
+	// codes the way raw teletext data does, so a run of blank cells (nbsp or
+	// plain space) is deferred instead of written immediately. Once real
+	// content (a text character or a mosaic cell) needs to be drawn, any
+	// pending colour change is committed using the LAST cells of that
+	// deferred run: a genuine left margin/padding run stays blank, and the
+	// control code(s) land immediately in front of the content they apply to.
+	// If there aren't enough deferred blanks nearby - e.g. a colour change in
+	// the middle of an unbroken run of mosaic cells - the remaining code
+	// byte(s) simply spend a fresh column instead. An earlier version tried
+	// to claw that column back from whatever blanks turned up later in the
+	// row, but that silently ate genuine spacing (like the gap between two
+	// pieces of real text) to pay for it, which is worse than the column
+	// loss it was fixing.
+	commitPending := func(codes []byte) {
+		blanksToFlush := pendingBlanks - len(codes)
+		if blanksToFlush < 0 {
+			blanksToFlush = 0
+		}
+		for i := 0; i < blanksToFlush; i++ {
+			writeCurrent(0x20)
+		}
+		pendingBlanks -= blanksToFlush
+		for _, c := range codes {
+			writeCurrent(c)
+			if pendingBlanks > 0 {
+				pendingBlanks--
+			}
+		}
+	}
+
+	// commitBgIfPending applies a still-unapplied background change. A blank
+	// cell's background is visible on screen (it renders as a colour-filled
+	// box), so a background run that's entirely blank - like a coloured strip
+	// between two pieces of text - still needs its own control code right
+	// where it starts; it can't be left deferred all the way to the next bit
+	// of real text the way foreground can, or a later background declaration
+	// would silently overwrite it before it was ever placed.
+	//
+	// Blanks accumulated while a new background is declared but not yet
+	// applied go into zoneBlanks rather than pendingBlanks, since they'll
+	// render in the NEW colour and must never be flushed as if they were
+	// old-colour filler. If pendingBlanks (the old-colour run right before
+	// this change) is too small to hold the 2-byte code by itself, cells are
+	// borrowed from the front of zoneBlanks to complete it - those cells were
+	// always going to be in the new colour anyway, so using one of them to
+	// hold the code instead of a blank costs nothing.
+	commitBgIfPending := func() {
+		if declaredBg == prevBg {
+			return
+		}
+		const needed = 2 // colour code + NEW_BACKGROUND
+		if pendingBlanks < needed {
+			borrow := needed - pendingBlanks
+			if borrow > zoneBlanks {
+				borrow = zoneBlanks
+			}
+			pendingBlanks += borrow
+			zoneBlanks -= borrow
+		}
+		commitPending([]byte{declaredBg, TCC_NEW_BACKGROUND})
+		prevBg = declaredBg
+		prevFg = declaredBg
+		// A background code is a plain alpha-range control code: it always
+		// renders blank at its own column and resets graphics mode on the
+		// real client, just like any other non-mosaic-colour byte < 0x20 -
+		// so any lingering hold is inert from here on.
+		graphicsMode = false
+		holdActive = false
+		pendingBlanks += zoneBlanks
+		zoneBlanks = 0
+	}
+
+	// rendersPatternFor computes, for each code in attrCodes, whether its
+	// own column will echo the held mosaic pattern (true) or render blank
+	// (false) on the real client, given hold_graphic=holdOn and
+	// pp_is_graphics_mode=gfxStart going into this batch. It mirrors the
+	// client's held_or_space, which is (pp_hold_graphic && was_graphics) at
+	// each individual code; graphics mode itself only ever changes at the
+	// fg code in this batch (if any, at fgCodeIndex), and that change takes
+	// effect immediately for whatever code comes after it in the same
+	// batch (pp_is_graphics_mode is NOT set-after, unlike fg colour/height).
+	rendersPatternFor := func(attrCodes []byte, fgCodeIndex int, isMosaic bool, holdOn bool, gfxStart bool) []bool {
+		out := make([]bool, len(attrCodes))
+		gfx := gfxStart
+		for i := range attrCodes {
+			out[i] = holdOn && gfx
+			if i == fgCodeIndex {
+				gfx = isMosaic // alpha -> false, mosaic-colour -> true, immediately
+			}
+		}
+		return out
+	}
+
+	// resolvePending first settles any still-pending background change, then
+	// decides which control codes (mosaic mode, foreground colour, double
+	// height) are needed to move from the last committed state to the
+	// currently declared (pending) one, and hands them to commitPending.
+	// Called right before any real content is drawn - either a mosaic cell,
+	// or the first non-blank text token following a run of filler spans -
+	// so codes always land immediately in front of the content they apply
+	// to, not buried inside it.
+	//
+	// Any mosaic pattern repeats deferred by the caller (pendingMosaicRepeats)
+	// get settled here too, using TCC_HOLD_MOSAICS plus whichever of the
+	// codes above are being sent anyway: on the real client, both HOLD's own
+	// column and every "set-after" code's own column (fg colour, double
+	// height, and the mosaic mode codes - all of them, like background,
+	// still show the OLD state at their own column) echo the previously
+	// active mosaic pattern as long as hold_graphic and graphics mode are
+	// both still active - so up to (1 + len(attrCodes)) repeats ride along
+	// for free on codes that were needed anyway. This is the exact
+	// compression the real hr-text broadcast uses (confirmed byte-for-byte
+	// against a real capture): e.g. 5 same-coloured, same-pattern mosaic
+	// cells can be sent as 3 literal pattern bytes, then HOLD, then the
+	// next colour-change code - both of the last two bytes' own columns
+	// render the held pattern in the OLD colour, yielding 5 visible cells
+	// from 3 literal bytes plus 2 bytes that were needed anyway.
+	//
+	// prevFg tracks the plain 0-7 colour digit only, never the
+	// alpha/mosaic-flavoured code byte. On the client, any byte that isn't
+	// itself an explicit control code (0x00-0x1F) - which includes every
+	// ordinary text character - leaves pp_FgColor and pp_is_graphics_mode
+	// completely untouched; and cg_color[N] (from an alpha code) and
+	// cg_color[N] (from mosaic code N+0x10, after subtracting the offset)
+	// resolve to the exact same palette entry. So a letter like the "V" in
+	// "Monduntergang" renders in the right colour whether the colour was
+	// last established via an alpha code or a mosaic code of the same
+	// digit - sending a redundant alpha-flavoured code purely because the
+	// active one happened to be mosaic-flavoured (or vice versa) was
+	// wasting a column on each side of any such letter for no visible
+	// effect.
+	resolvePending := func(isMosaic bool, mosaicColorDigit byte, mosaicMode byte) {
+		commitBgIfPending()
+
+		desiredFg := pendingFg
+		if isMosaic {
+			desiredFg = mosaicColorDigit
+		}
+		// A colour code must also fire whenever we need to enter graphics
+		// mode but aren't in it yet - even if the colour DIGIT already
+		// matches prevFg. pp_is_graphics_mode on the client is only ever
+		// set by an explicit mosaic-colour code (0x10-0x17); nothing else
+		// touches it. If a background reset (or anything else) left it
+		// false and the next mosaic cell happens to want the same digit
+		// that was already active, skipping the code would leave the
+		// client in alpha mode, and it would render the raw pattern byte
+		// as a stray text character instead of applying the offset and
+		// drawing the graphic. Text never has the opposite problem - a
+		// plain character renders as itself regardless of graphics mode,
+		// so no symmetrical force is needed when isMosaic is false.
+		fgChanged := desiredFg != prevFg || (isMosaic && !graphicsMode)
+		dhChanged := pendingDH != prevDH
+		// Contiguous/separated mode DOES need its own control code here,
+		// unlike an earlier version of this function assumed - the client
+		// only recognises a mosaic pattern byte as "raw" (applying the
+		// offset and updating pp_held_char, which TCC_HOLD_MOSAICS needs
+		// something valid to echo) when it's sent un-offset; so the mosaic
+		// cell below always sends the raw pattern byte, and the mode code
+		// is what tells the client whether to add 0x60 or 0x80 to it.
+		modeChanged := isMosaic && mosaicMode != prevMosaicMode
+
+		var attrCodes []byte
+		fgCodeIndex := -1
+		if modeChanged {
+			if mosaicMode == 's' {
+				attrCodes = append(attrCodes, TCC_SEPERATED_MOSAICS)
+			} else {
+				attrCodes = append(attrCodes, TCC_CONTINUOUS_MOSAICS)
+			}
+		}
+		if fgChanged {
+			fgCodeIndex = len(attrCodes)
+			code := desiredFg
+			if isMosaic {
+				code += TCC_MOSAIC_BLACK
+			}
+			attrCodes = append(attrCodes, code)
+		}
+		if dhChanged {
+			if pendingDH {
+				attrCodes = append(attrCodes, TCC_DOUBLE_HEIGHT)
+			} else {
+				attrCodes = append(attrCodes, TCC_NORMAL_HEIGHT)
+			}
+		}
+		if modeChanged {
+			prevMosaicMode = mosaicMode
+		}
+
+		hadRepeats := pendingMosaicRepeats > 0
+		var finalCodes []byte
+		var rendersPattern []bool
+		profitable := false
+
+		if hadRepeats {
+			needHold := !holdActive
+			// Hypothetical: if we prepend HOLD, every attrCode after it
+			// sees hold already armed.
+			hypRendersPattern := rendersPatternFor(attrCodes, fgCodeIndex, isMosaic, true, graphicsMode)
+			patternSlots := 0
+			for _, r := range hypRendersPattern {
+				if r {
+					patternSlots++
+				}
+			}
+			freeSlots := patternSlots
+			if needHold {
+				freeSlots++
+			}
+			profitable = freeSlots >= 2 || (!needHold && freeSlots >= 1)
+			if profitable {
+				covered := pendingMosaicRepeats
+				if covered > freeSlots {
+					covered = freeSlots
+				}
+				leftover := pendingMosaicRepeats - covered
+				for i := 0; i < leftover; i++ {
+					writeCurrent(heldPattern)
+				}
+				if needHold {
+					finalCodes = append(finalCodes, TCC_HOLD_MOSAICS)
+					holdActive = true
+				}
+				finalCodes = append(finalCodes, attrCodes...)
+				rendersPattern = hypRendersPattern
+			} else {
+				for i := 0; i < pendingMosaicRepeats; i++ {
+					writeCurrent(heldPattern)
+				}
+				finalCodes = append(finalCodes, attrCodes...)
+				rendersPattern = rendersPatternFor(attrCodes, fgCodeIndex, isMosaic, holdActive, graphicsMode)
+			}
+			pendingMosaicRepeats = 0
+		} else {
+			finalCodes = append(finalCodes, attrCodes...)
+			rendersPattern = rendersPatternFor(attrCodes, fgCodeIndex, isMosaic, holdActive, graphicsMode)
+		}
+
+		// If hold is still armed (whether from just now, or dangling from
+		// an earlier, unrelated repeat run) and it's still in graphics
+		// mode, and any attrCode would echo a pattern that isn't being
+		// intentionally exploited right now (only possible in the "not
+		// profitable"/no-repeats cases above), release first so it renders
+		// as proper blank instead of a stray leftover shape.
+		anyPattern := false
+		for _, r := range rendersPattern {
+			if r {
+				anyPattern = true
+				break
+			}
+		}
+		if holdActive && anyPattern && !(hadRepeats && profitable) {
+			finalCodes = append([]byte{TCC_RELEASE_MOSAICS}, finalCodes...)
+			rendersPattern = make([]bool, len(attrCodes))
+			holdActive = false
+		}
+
+		if fgChanged {
+			graphicsMode = isMosaic
+		}
+		if holdActive && !graphicsMode {
+			// Graphics mode just turned off (or was already off) - hold is
+			// now inert and can be forgotten without spending a byte.
+			holdActive = false
+		}
+
+		if fgChanged {
+			prevFg = desiredFg
+		}
+		if dhChanged {
+			prevDH = pendingDH
+		}
+
+		// Commit: HOLD/RELEASE bytes are never blank-eligible; an attrCode
+		// is blank-eligible exactly when rendersPattern says it renders
+		// blank rather than echoing the held pattern.
+		blankEligible := make([]bool, len(finalCodes))
+		ptr := 0
+		for i, c := range finalCodes {
+			if c == TCC_HOLD_MOSAICS || c == TCC_RELEASE_MOSAICS {
+				blankEligible[i] = c == TCC_RELEASE_MOSAICS // RELEASE always renders blank
+				continue
+			}
+			r := false
+			if ptr < len(rendersPattern) {
+				r = rendersPattern[ptr]
+			}
+			blankEligible[i] = !r
+			ptr++
+		}
+
+		eligibleCount := 0
+		for _, e := range blankEligible {
+			if e {
+				eligibleCount++
+			}
+		}
+		blanksToFlush := pendingBlanks - eligibleCount
+		if blanksToFlush < 0 {
+			blanksToFlush = 0
+		}
+		for i := 0; i < blanksToFlush; i++ {
+			writeCurrent(0x20)
+		}
+		pendingBlanks -= blanksToFlush
+
+		for i, c := range finalCodes {
+			writeCurrent(c)
+			if blankEligible[i] && pendingBlanks > 0 {
+				pendingBlanks--
+			}
+		}
+	}
+
+	writeReal := func(b byte, isMosaic bool, mosaicColorDigit byte, mosaicMode byte) {
+		// If this is the last free column in the row, a colour-change code
+		// would land there instead of the character it's meant to colour -
+		// the code would "succeed" but leave nothing after it to show for
+		// it, while the actual character silently falls off the row. Better
+		// to draw the character itself, even in a stale colour, than spend
+		// the final column on an invisible control code.
+		if currentCol < 39 {
+			resolvePending(isMosaic, mosaicColorDigit, mosaicMode)
+		}
+		writeCurrent(b)
+	}
+
+	navField := ""
+	currentSubpage := 0
+	numSubpages := 0
+
+	for {
+		tt := z.Next()
+		if tt == html.ErrorToken {
+			break
+		}
+
+		token := z.Token()
+
+		switch tt {
+		case html.StartTagToken, html.SelfClosingTagToken:
+			switch token.Data {
+
+			case "pre":
+				var idVal string
+				for _, attr := range token.Attr {
+					if attr.Key == "id" {
+						idVal = attr.Val
+						break
+					}
+				}
+
+				navField = ""
+				switch idVal {
+				case "ttxPrevPageNum":
+					navField = "prev"
+				case "ttxNextPageNum":
+					navField = "next"
+				case "ttxSubpageNum":
+					navField = "sub"
+				case "ttxNumSubpages":
+					navField = "numsub"
+				default:
+					if m := hrRowRe.FindStringSubmatch(idVal); m != nil {
+						n, err := strconv.Atoi(m[1])
+						if err == nil {
+							flushPendingMosaicRepeats()
+							currentRow = n
+							resetRowState()
+						}
+					}
+				}
+
+			case "span":
+				if currentRow < 0 || currentRow > 24 {
+					continue
+				}
+
+				var classVal string
+				for _, attr := range token.Attr {
+					if attr.Key == "class" {
+						classVal = attr.Val
+						break
+					}
+				}
+				if classVal == "" {
+					continue
+				}
+
+				// A single mosaic character cell, e.g. class="g1c47c"
+				// (contiguous) or class="g1s46a" (separated).
+				if m := hrMosaicRe.FindStringSubmatch(classVal); m != nil {
+					mosaicMode := m[1][0]
+					colorDigit := byte(mustAtoi(m[2]))
+					if hexVal, err := strconv.ParseUint(m[3], 16, 8); err == nil {
+						// The client applies its own offset (+0x60
+						// separated, +0x80 contiguous) to a raw pattern
+						// byte, so the byte is sent un-offset here - see
+						// the note on resolvePending for why that matters
+						// for TCC_HOLD_MOSAICS.
+						pattern := byte(hexVal)
+						if pattern == heldPattern && colorDigit == prevFg &&
+							mosaicMode == prevMosaicMode && graphicsMode {
+							// Same pattern, same colour, same mode as what's
+							// already on screen at this position - defer it
+							// instead of spending a fresh byte; resolvePending
+							// will use TCC_HOLD_MOSAICS (plus whichever
+							// attribute codes come next) to cover these for
+							// free wherever that's actually cheaper than
+							// writing them out literally.
+							pendingMosaicRepeats++
+						} else {
+							writeReal(pattern, true, colorDigit, mosaicMode)
+							heldPattern = pattern
+							pendingMosaicRepeats = 0
+						}
+					}
+					skipNextText = true
+					continue
+				}
+
+				// hr-text re-declares the complete current attribute set
+				// (bg, fg, size, ...) on every span where something actually
+				// changed, so the presence of "dh" here is the ground truth
+				// for double height at this point in the row - its absence
+				// means double height is (or goes back to) off, not "leave
+				// it alone".
+				spanIsDH := false
+				for _, class := range strings.Fields(classVal) {
+					if class == "dh" {
+						spanIsDH = true
+						continue
+					}
+					if m := hrBgRe.FindStringSubmatch(class); m != nil {
+						newBg := byte(mustAtoi(m[1]))
+						if newBg != declaredBg {
+							commitBgIfPending()
+							declaredBg = newBg
+							zoneBlanks = 0
+						}
+						continue
+					}
+					if m := hrFgRe.FindStringSubmatch(class); m != nil {
+						pendingFg = byte(mustAtoi(m[1]))
+					}
+				}
+				pendingDH = spanIsDH
+			}
+
+		case html.EndTagToken:
+			if token.Data == "pre" {
+				// Flush before currentRow goes to -1 - writeCurrent (via
+				// writeToBuffer) silently no-ops on a negative row index,
+				// so flushing after this line would write nowhere at all.
+				flushPendingMosaicRepeats()
+				currentRow = -1
+			}
+
+		case html.TextToken:
+			text := token.Data
+
+			if navField != "" {
+				if val, err := strconv.Atoi(strings.TrimSpace(text)); err == nil {
+					switch navField {
+					case "prev":
+						nav.prevPage = val
+					case "next":
+						nav.nextPage = val
+					case "sub":
+						currentSubpage = val
+					case "numsub":
+						numSubpages = val
+					}
+				}
+				navField = ""
+				continue
+			}
+
+			if currentRow < 0 || currentRow > 24 || skipNextText {
+				skipNextText = false
+				continue
+			}
+
+			// Leaving mosaic context for plain text/blanks: any pending
+			// held-graphics repeats can no longer safely ride on an
+			// upcoming code's echo without risking a mismatch between
+			// "blank" and "pattern" pooling (a plain text/blank run has no
+			// mosaic colour context of its own to piggyback the repeat
+			// count on), so cash them in as literal bytes now.
+			if pendingMosaicRepeats > 0 {
+				for i := 0; i < pendingMosaicRepeats; i++ {
+					writeCurrent(heldPattern)
+				}
+				pendingMosaicRepeats = 0
+			}
+
+			// A text node that carries real (non-blank) content settles any
+			// colour change pending from earlier, purely-blank filler spans
+			// right now - before its own leading blanks (if any) get added to
+			// the pool. Otherwise those leading blanks would merge with the
+			// filler pool and let a later flush push the colour codes past
+			// them, landing right before the real text instead of in front of
+			// the whole run. A text node that's blank through and through is
+			// itself filler, so it's simply added to the pool as before.
+			hasReal := false
+			for _, r := range text {
+				if r == ' ' || r == ' ' || r == '\n' || r == '\r' || r == '\t' {
+					continue
+				}
+				hasReal = true
+				break
+			}
+			if hasReal {
+				resolvePending(false, 0, 'c')
+			}
+
+			for _, r := range text {
+				if currentCol >= 40 {
+					break
+				}
+				switch {
+				case r == ' ': // non-breaking space character
+					if declaredBg != prevBg {
+						zoneBlanks++
+					} else {
+						pendingBlanks++
+					}
+				case r == ' ':
+					if declaredBg != prevBg {
+						zoneBlanks++
+					} else {
+						pendingBlanks++
+					}
+				case r == '\n' || r == '\r' || r == '\t':
+					// pretty-printed HTML whitespace, not real page content
+				default:
+					writeReal(zdfEncodeChar(r), false, 0, 'c')
+				}
+			}
+		}
+	}
+
+	// The document can end (</pre> and EOF) while the last row still has
+	// deferred mosaic repeats - flush them the same way a new row starting
+	// would, so the final row's trailing pattern isn't silently dropped.
+	flushPendingMosaicRepeats()
+
+	nav.numberOfSubpages = numSubpages
+	if currentSubpage > 1 {
+		nav.prevSubpage = currentSubpage - 1
+	}
+	if numSubpages == 0 || currentSubpage < numSubpages {
+		nav.nextSubpage = currentSubpage + 1
+	}
+
+	return pageBuffer, nav
+}
+
+// mustAtoi converts a string already validated by a regexp digit group to an int.
+func mustAtoi(s string) int {
+	n, _ := strconv.Atoi(s)
+	return n
 }
 
 // --- SVT Text ---
@@ -6235,6 +7442,177 @@ func handleStaticFile(w http.ResponseWriter, filename string) {
 	}
 	w.WriteHeader(200)
 	w.Write(data)
+}
+
+// --- SRG (SRF 1, SRF 2, SRF Info / RTS 1, RTS 2 / RSI LA 1, RSI LA 2) ---
+// SRG because these stations are all part of the Swiss Broadcasting Corporation (SRG SSR)
+//
+// Like NOS-TT it doesn't need a parser function because we get the data in raw teletext binary
+//
+// A small SPA that fetches page data as JSON from:
+//   GET https://api.teletext.ch/channels/{channel}/pages/{pageNumber}
+// Every subpage entry contains "ep1Info.data.ep1Format.content": the raw teletext row data, base64 encoded.
+
+type ttchEp1Format struct {
+	Content string `json:"content"`
+}
+
+type ttchData struct {
+	Ep1Format ttchEp1Format `json:"ep1Format"`
+}
+
+type ttchEp1Info struct {
+	Data ttchData `json:"data"`
+}
+
+type ttchSubpage struct {
+	SubpageNumber int         `json:"subpageNumber"`
+	Ep1Info       ttchEp1Info `json:"ep1Info"`
+}
+
+type ttchPage struct {
+	PageNumber   int           `json:"pageNumber"`
+	PreviousPage int           `json:"previousPage"`
+	NextPage     int           `json:"nextPage"`
+	Subpages     []ttchSubpage `json:"subpages"`
+}
+
+func srgGetTeletexPage(pageNr string, channel string, dirStation string) bool {
+	parts := strings.Split(pageNr, "-")
+	page := parts[0]
+
+	uiSub := 1
+	if len(parts) > 1 {
+		if v, err := strconv.Atoi(parts[1]); err == nil && v > 0 {
+			uiSub = v
+		}
+	}
+
+	url := fmt.Sprintf("https://api.teletext.ch/channels/%s/pages/%s", channel, page)
+	logFetchingPage(url)
+
+	client := http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(url)
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		fmt.Println("HTTP Error: Could not retrieve page", pageNr, "Status:", resp.StatusCode)
+		return true
+	}
+
+	var ttPage ttchPage
+	if err := json.NewDecoder(resp.Body).Decode(&ttPage); err != nil {
+		fmt.Println("JSON decode error:", err)
+		return true
+	}
+
+	if len(ttPage.Subpages) == 0 {
+		fmt.Println("No subpages returned for", pageNr)
+		return true
+	}
+
+	if uiSub > len(ttPage.Subpages) {
+		uiSub = 1
+	}
+	subIdx := uiSub - 1
+
+	rawContent := ttPage.Subpages[subIdx].Ep1Info.Data.Ep1Format.Content
+	body, err := base64.StdEncoding.DecodeString(rawContent)
+	if err != nil {
+		fmt.Println("Base64 decode error:", err)
+		return true
+	}
+
+	row0 := make([]byte, 40)
+	for i := range row0 {
+		row0[i] = 0x20
+	}
+	row24 := make([]byte, 40)
+	for i := range row24 {
+		row0[i] = 0x20
+	}
+	dt := getORFDate() // yes reuse ORF date here, because why not?
+	var stationPage string
+
+	// trailing spaces are needed to overwrite the 2-letter Weekday abbreviation
+	switch channel {
+	case "SRF1":
+		stationPage = "\x07" + parts[0] + "  SRF 1    "
+	case "SRFzwei":
+		stationPage = "\x07" + parts[0] + "  SRF zwei "
+	case "SRFInfo":
+		stationPage = "\x07" + parts[0] + "  SRF info "
+	case "RTSUn":
+		stationPage = "\x07" + parts[0] + "  RTS 1    "
+	case "RTSDeux":
+		stationPage = "\x07" + parts[0] + "  RTS 2    "
+	case "RSILA1":
+		stationPage = "\x07" + parts[0] + "  RSI LA 1 "
+	case "RSILA2":
+		stationPage = "\x07" + parts[0] + "  RSI LA 2 "
+	}
+
+	if strings.Contains(channel, "SRF") {
+		copy(row24[0:], "\x01Kurz\xDCbersicht  \x02Sport  \x03Meteo \x06TV&Radio")
+	}
+	if strings.Contains(channel, "RTS") {
+		copy(row24[0:], "\x01Index    \x02Sport     \x03Meteo    \x06TV&Radio")
+	}
+	if strings.Contains(channel, "RSI") {
+		copy(row24[0:], "\x01Indice    \x02Sport    \x03Meteo    \x06TV&Radio")
+	}
+
+	copy(row0[19:], stringToLatin1Bytes(dt))
+	copy(row0[7:], []byte(stationPage))
+
+	// Pages don't always fill all 24 rows; pad out to the full 920-byte grid with spaces.
+	// This excludes to header and fastext rows
+	fullPage := bytes.Repeat([]byte{0x20}, 920)
+	copy(fullPage, body)
+
+	var nav NavignationInfo
+	nav.numberOfSubpages = len(ttPage.Subpages)
+	if uiSub > 1 {
+		nav.prevSubpage = uiSub - 1
+	}
+	if uiSub < nav.numberOfSubpages {
+		nav.nextSubpage = uiSub + 1
+	}
+	if nav.numberOfSubpages > 1 {
+		nav.cycleTime = 8
+	}
+
+	pp, np, ps, ns, ct := "", "", "", "", ""
+	if ttPage.PreviousPage > 0 {
+		pp = fmt.Sprintf("pn=p_%d-1\n", ttPage.PreviousPage)
+	}
+	if ttPage.NextPage > 0 {
+		np = fmt.Sprintf("pn=n_%d-1\n", ttPage.NextPage)
+	}
+	if nav.numberOfSubpages > 1 {
+		ps, ns, ct = getPrevNextSubpage(page, nav)
+	}
+
+	var ftl FastextLinks
+	ftl.ftl1 = "101-0"
+	ftl.ftl2 = "180-0"
+	ftl.ftl3 = "500-0"
+	ftl.ftl4 = "700-0"
+
+	var output []byte
+	output = append(output, []byte(fmt.Sprintf(
+		"%s%s%s%s%sftl=%s\nftl=%s\nftl=%s\nftl=%s\n<pre>",
+		pp, np, ps, ns, ct, ftl.ftl1, ftl.ftl2, ftl.ftl3, ftl.ftl4))...)
+	output = append(output, row0...)
+	output = append(output, fullPage...)
+	output = append(output, row24...)
+	output = append(output, []byte("</pre>")...)
+
+	savePage(dirStation, pageNr, output)
+	return true
 }
 
 // --- User Config (UD)

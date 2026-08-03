@@ -30,6 +30,16 @@ Teletext 64 Ultimate has its own dedicated server at petsciiproxy.nl, so you don
 |Webfax 2 |UK |
 |SPARK TVARK teletext |UK |
 |WDR Text |Germany |
+|hr-text |Germany |
+|SWR Baden-Württemberg |Germany |
+|SWR Rheinland-Pfalz |Germany |
+|SRF 1 |Switzerland, German |
+|SRF zwei |Switzerland, German |
+|SRF info |Switzerland, German |
+|RTS 1 |Switzerland, French |
+|RTS 2 |Switzerland, French |
+|RSI LA 1 |Switzerland, Italian |
+|RSI LA 2 |Switzerland, Italian |
 
 My mission: add as many Teletext services as possible. So let me know if you have any wishes.
 
