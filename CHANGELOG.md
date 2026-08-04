@@ -1,5 +1,12 @@
 # **Teletext64U** changelog
 
+## [2.4.1] - 2026-08-04
+
+### Changed PetsciiProxy
+- Main.go was more than 7000 lines. I have split the code into files per station/parser and some general files
+- Removed the YLE Teksti-TV default info page from code and put it into: assets/tekstitv-info.bin
+
+
 ## [2.4.0] - 2026-08-03
 
 ### Added
