@@ -1,5 +1,16 @@
 # **Teletext64U** changelog
 
+## [2.5.0] - 2026-08-13
+
+### Added
+New stations: I did something new here and created teletext services out of RSS feeds.
+- NOS Nieuws (Netherlands) - Based on https://nos.nl/feeds
+- Forum64 (Germany) - Based on https://www.forum64.de/index.php?thread-list-rss-feed/
+
+### Notes 
+- I wanted to use the orange colour for the Forum64 logo and for the index and story pages for the Dutch Royal Family on NOS Nieuws. Orange is not supported by level 1.x teletext. I re-used the not implemented TCC_DOUBLE_WIDTH (0x0E) for TCC_ALPHA_ORANGE and TCC_DOUBLE_SIZE (0x0F) for TCC_MOSAIC_ORANGE.
+- The Forum64 RSS feed offers very little content at this moment, only the last 20 forum updates. The website itself offers way more. Due to restrictions that data cannot be parsed right now. 
+
 ## [2.4.1] - 2026-08-04
 
 ### Changed PetsciiProxy

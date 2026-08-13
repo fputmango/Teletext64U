@@ -84,7 +84,7 @@ import (
 )
 
 // Version
-const pp_version = "2.4.1"
+const pp_version = "2.5.0"
 
 // Supported teletext services
 const (
@@ -118,7 +118,9 @@ const (
 	DirRTS2       = "RTS2"
 	DirRSILA1     = "RSILA1"
 	DirRSILA2     = "RSILA2"
-	DirUD         = "UD" // User Directory where user preferences are stored for the stand alone WiC64 edition
+	DirNOSNEWS    = "NOSNEWS" // RSS-generated NOS Nieuws pages (Dutch), see nosnews.go
+	DirFORUM64    = "FORUM64" // RSS-generated forum64.de thread activity (German), see forum64.go
+	DirUD         = "UD"      // User Directory where user preferences are stored for the stand alone WiC64 edition
 )
 
 // Each service has its own handler
@@ -153,6 +155,8 @@ var handlers = map[string]http.HandlerFunc{
 	DirRTS2:       makeHandler(DirRTS2, func(p string) bool { return srgGetTeletexPage(p, "RTSDeux", DirRTS2) }),
 	DirRSILA1:     makeHandler(DirRSILA1, func(p string) bool { return srgGetTeletexPage(p, "RSILA1", DirRSILA1) }),
 	DirRSILA2:     makeHandler(DirRSILA2, func(p string) bool { return srgGetTeletexPage(p, "RSILA2", DirRSILA2) }),
+	DirNOSNEWS:    makeHandler(DirNOSNEWS, nosnewsGetTeletexPage),
+	DirFORUM64:    makeHandler(DirFORUM64, forum64GetTeletexPage),
 }
 
 // Teletext control codes (range 0x00..0x1F); Alpha is a regular character; a mosaic is a graphics character
@@ -350,6 +354,9 @@ If you do not have one, you can request one here: https://developer.yle.fi/en/in
 		}
 	}()
 
+	// NOSNEWS has no background ticker - it polls its feed lazily, only when a page is actually
+	// requested and the data has gone stale (see nosNewsCategory.pollIfStale in nosnews.go).
+
 	fmt.Printf("Teletext PetsciiProxy server v%v, serving on port %d\n", pp_version, port)
 
 	address := fmt.Sprintf(":%d", port)
@@ -417,6 +424,8 @@ const stationRecheckInterval = 5 * time.Minute
 // note: syncChunkytextRepo checks if there is a newer repo.
 var localOnlyStations = map[string]bool{
 	DirCHUNKYTEXT: true,
+	DirNOSNEWS:    true,
+	DirFORUM64:    true,
 }
 
 type stationHealth struct {
@@ -479,6 +488,12 @@ func makeHandler(dirStation string, fetch fetchFunc) http.HandlerFunc {
 		path := filepath.Join(dirStation, pageName)
 		if localOnlyStations[dirStation] {
 			fetch(pageName)
+			// Always complete this request's log line here, unconditionally - fetch() may or may
+			// not have triggered a lazy poll internally (see pollIfStale in nosnews.go/forum64.go),
+			// and that poll logs itself separately via logBackgroundPoll when it happens. Waiting on
+			// it to complete this line left it dangling on every request that didn't happen to
+			// trigger one - see logFetchingPage/logBackgroundPoll in common.go for the full story.
+			logFetchingPage(path)
 			writeResponse(w, dirStation, pageName)
 			return
 		}

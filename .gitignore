@@ -18,6 +18,8 @@
 !/PetsciiProxy/ardtext.go
 !/PetsciiProxy/common.go
 !/PetsciiProxy/dr.go
+!/PetsciiProxy/forum64.go
+!/PetsciiProxy/nosnews.go
 !/PetsciiProxy/nostt.go
 !/PetsciiProxy/orf.go
 !/PetsciiProxy/srg.go
@@ -30,6 +32,10 @@
 !/PetsciiProxy/zdftext.go
 !/PetsciiProxy/assets/
 !/PetsciiProxy/assets/tekstitv-info.bin
+!/PetsciiProxy/assets/forum64/
+!/PetsciiProxy/assets/forum64/*.bin
+!/PetsciiProxy/assets/nosnews/
+!/PetsciiProxy/assets/nosnews/*.bin
 !/PetsciiProxy/Makefile
 !/PetsciiProxy/dist/
 !/PetsciiProxy/dist/petsciiproxy-linux-386
