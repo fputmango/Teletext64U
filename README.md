@@ -1,8 +1,8 @@
 # Teletext 64 Ultimate
 
-Teletext program showing live pages from the internet for the Commodore 64 Ultimate and other Ultimate products that have networking capabilities like the Ultimate 64 and the Ultimate II+. The WiC64 is also supported. 
+Teletext program showing live pages from the internet for the Commodore 64 Ultimate and other Ultimate products that have networking capabilities like the Ultimate 64 and the Ultimate II+. The WiC64 and Meatloaf devices are also supported. 
 
-The program also runs on an original stock C64/C128 in C64 mode with a WiC64 or an Ultimate II+ cartridge.
+The program also runs on an original stock C64/C128 in C64 mode with a WiC64, a Meatloaf or an Ultimate II+ cartridge.
 
 Teletext 64 Ultimate has its own dedicated server at petsciiproxy.nl, so you don't need to run a local server. The WiC64 version is now available in the WiC Portal and also runs in the VICE emulator!
 
@@ -42,7 +42,8 @@ Teletext 64 Ultimate has its own dedicated server at petsciiproxy.nl, so you don
 |RSI LA 2 |Switzerland, Italian |
 |NOS Nieuws |The Netherlands (RSS feed) |
 |Forum64 |Germany (RSS feed) |
-
+|MTVA Teletext |Hungary |
+ 
 My mission: add as many Teletext services as possible. So let me know if you have any wishes.
 
 ## Installation

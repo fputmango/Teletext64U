@@ -1,5 +1,38 @@
 # **Teletext64U** changelog
 
+## [2.6.1] - 2026-08-26
+
+### Added
+- The Meatloaf editon has it's own short code now. It can be loaded like this: LOAD "ML:TELETEXT64",8
+New stations:
+- BMN1 Bollentekst (The Netherlands)
+- HBN Teksti-TV (Finland) - Helsinki Broadcast Network: A recreation of Teksti-TV in the 1990s.
+- MTVA Teletext (Hungary)
+
+### Changed
+-The boot screen of the Meatloaf edition is now similar to that of the single-PRG WiC64 edition.
+-The Meatloaf edition now checks the device number from which the program was loaded.
+-Changed the way local national characters are handled. Separate font files have been created for the G2 character sets. A full ETS 300 706 teletext implementation was not possible due to the C64's memory limitations, so the implementation is loosely based on G2. As a result, all specific Hungarian characters are now supported.
+
+### Fixed
+- Corrected an extended ASCII mapping and a wrongly skipped mosaic/held-char check.
+
+### Notes on MTVA Teletext 
+- Don't expect a perfect representation because the HTML source I'm working with is a bit sloppily put together. And it does not provide graphics, only text. I recreated the TXT logo on page 100. Maybe I'll do some more in the future.
+- Important to note: numerous pages are unavailable and only display a double height text. Rougly translated it says: "Our task is to conduct a comprehensive review of the online news services of the public media. We kindly ask for your understanding and patience during this period, as we work towards creating an independent and reliable public media service. Thank you."
+
+
+## [2.6.0] - 2026-08-22
+
+### Added
+- Support for Meatloaf! If you’re unfamiliar with this great device, check out these websites for more information: https://meatloaf.cc/ and https://github.com/idolpx/meatloaf. I am only providing a single PRG version (at this moment). User preferences are stored on the PetsciiProxy server. 
+- Important: Meatloaf firmware needs to be updated because a new command has been added that reads out the MAC address of your Meatloaf device. Just like the WiC64 edition, the MAC address is used to uniquely identify users.
+
+### Notes on Meatloaf
+- Building in support was super easy! Why? Because the default cbm_open(), cbm_read() and cbm_close() functions could be used.
+- This release was not published on GitHub; instead it was shared with the Meatloaf Discord group for testing purposes only! 
+
+
 ## [2.5.0] - 2026-08-13
 
 ### Added
@@ -10,6 +43,7 @@ New stations: I did something new here and created teletext services out of RSS 
 ### Notes 
 - I wanted to use the orange colour for the Forum64 logo and for the index and story pages for the Dutch Royal Family on NOS Nieuws. Orange is not supported by level 1.x teletext. I re-used the not implemented TCC_DOUBLE_WIDTH (0x0E) for TCC_ALPHA_ORANGE and TCC_DOUBLE_SIZE (0x0F) for TCC_MOSAIC_ORANGE.
 - The Forum64 RSS feed offers very little content at this moment, only the last 20 forum updates. The website itself offers way more. Due to restrictions that data cannot be parsed right now. 
+
 
 ## [2.4.1] - 2026-08-04
 

@@ -13,28 +13,42 @@ Functionality:
 - Parser/transformer
 
 Supported teletext services:
-- NOS Teletekst / NOS-TT (Dutch teletext)
-- ARD TEXT (German: 'Der Teletext im Ersten')
-- NMS CEEFAX (British teletext, closed by the BBC in 2012 and recreated by Nathan Dane)
-- TEEFAX (British teletext, a community based service with a huge collection of fine teletext art, historical pages and other great stuff)
-- YLE Teksti-TV (Finnish / Suomi)
-- SVT Text (Swedish teletext)
-- ZDF Text, ZDF Info, ZDF Neo (German)
-- 3SAT (German)
-- DR Tekst-TV (Danish teletext)
-- ORF 1, ORF 2, ORF III, ORF Sport+ (Austria)
-- Chunkytext (UK)
-- Webfax 1 & Webfax 1 (UK)
-- SPARK (UK)
-- WDR text (German)
-- hr-text (German)
-- SWR BW (German, Baden-Württemberg)
-- SWR RP (German, Rheinland-Pfalz)
-- SRF 1, zwei, SRF Info, RTS Un, RTS Deux, RSI LA 1, RSI LA 2 (Switzerland, German/French/Italian)
 
-Next up candidates:
+== German-language ==
+- ARD TEXT (Germany: 'Der Teletext im Ersten')
+- ZDF Text, ZDF Info, ZDF Neo (Germany)
+- WDR text (Germany)
+- ORF 1, ORF 2, ORF III, ORF Sport+ (Austria)
+- 3SAT (Germany)
+- hr-text (Germany)
+- SWR BW (Germany, Baden-Württemberg)
+- SWR RP (Germany, Rheinland-Pfalz)
+- SRF 1, SRF zwei, SRF Info (Switzerland)
+- Forum64 (Germany, RSS feed)
+
+== English-language ==
+- NMS CEEFAX (UK, closed by the BBC in 2012 and recreated by Nathan Dane)
+- TEEFAX (UK, a community-based service with a huge collection of fine teletext art, historical pages and other great stuff)
+- Chunkytext (UK)
+- Webfax 1 & Webfax 2 (UK)
+- SPARK (UK, by TVARK)
+
+== Other languages ==
+- NOS Teletekst / NOS-TT (The Netherlands, Dutch)
+- NOS Nieuws (The Netherlands, Dutch, RSS feed)
+- BMN1 Bollentekst (The Netherlands, Dutch)
+- SVT Text (Sweden, Swedish)
+- YLE Teksti-TV (Finland, Finnish)
+- HBN Teksti-TV (Finland, Finnish)
+- DR Tekst-TV (Denmark, Danish)
+- RTS Un, RTS Deux (Switzerland, French)
+- RSI LA 1, RSI LA 2 (Switzerland, Italian)
+- MTVA Text (Hungary, Hungarian)
+
+Next up potential candidates:
 - RTP teletexto (Portugal) - https://www.rtp.pt/wportal/fab-txt/texto/100/100_0001.htm
-- ...?
+- RÚV (The Icelandic National Broadcasting Service), Textavarpið (Textvarpið) https://textavarp.is/sida/100/1
+
 
 The NOS-TT file format is being used for the other teletext services:
 Is set up fairly efficient: mostly around 1073 bytes; a little bit bigger if a page has subpages.
@@ -84,7 +98,7 @@ import (
 )
 
 // Version
-const pp_version = "2.5.0"
+const pp_version = "2.6.1"
 
 // Supported teletext services
 const (
@@ -105,6 +119,7 @@ const (
 	DirCEEFAX     = "CEEFAX"
 	DirTEEFAX     = "TEEFAX"
 	DirTEKSTI     = "TEKSTI-TV"
+	DirHBNTEKSTI  = "HBN-TEKSTI-TV"
 	DirSVT        = "SVT-TEXT"
 	DirDR         = "DR-TEKST-TV"
 	DirCHUNKYTEXT = "CHUNKYTEXT"
@@ -118,10 +133,17 @@ const (
 	DirRTS2       = "RTS2"
 	DirRSILA1     = "RSILA1"
 	DirRSILA2     = "RSILA2"
-	DirNOSNEWS    = "NOSNEWS" // RSS-generated NOS Nieuws pages (Dutch), see nosnews.go
-	DirFORUM64    = "FORUM64" // RSS-generated forum64.de thread activity (German), see forum64.go
-	DirUD         = "UD"      // User Directory where user preferences are stored for the stand alone WiC64 edition
+	DirNOSNEWS    = "NOSNEWS"  // RSS-generated NOS Nieuws pages (Dutch), see nosnews.go
+	DirFORUM64    = "FORUM64"  // RSS-generated forum64.de thread activity (German), see forum64.go
+	DirMTVATXT    = "MTVA-TXT" // teletext.hu, MTVA's official teletext service (Hungarian), see mtvatxt.go
+	DirBMN1       = "BMN1"     // Bollentekst
+	DirUD         = "UD"       // User Directory where user preferences are stored for the stand alone WiC64 edition
 )
+
+// Pseudo-"station" label used in the CSV log / download log line for hits on /downloads/. Not a
+// real teletext service and has no folder-per-station handler like the map above - see the
+// /downloads/ registration in main() and logDownloadOnce below.
+const StationDownloads = "DOWNLOADS"
 
 // Each service has its own handler
 var handlers = map[string]http.HandlerFunc{
@@ -146,6 +168,7 @@ var handlers = map[string]http.HandlerFunc{
 	DirWEBFAX2:    makeHandler(DirWEBFAX2, func(p string) bool { return webfaxGetTeletexPage(p, "Webfax2", DirWEBFAX2) }),
 	DirSPARK:      makeHandler(DirSPARK, sparkGetTeletexPage),
 	DirTEKSTI:     makeHandler(DirTEKSTI, tekstiGetTeletexPage),
+	DirHBNTEKSTI:  makeHandler(DirHBNTEKSTI, hbntekstiGetTeletexPage),
 	DirSVT:        makeHandler(DirSVT, svttextGetTeletexPage),
 	DirDR:         makeHandler(DirDR, drteksttvGetTeletexPage),
 	DirSRF1:       makeHandler(DirSRF1, func(p string) bool { return srgGetTeletexPage(p, "SRF1", DirSRF1) }),
@@ -157,6 +180,8 @@ var handlers = map[string]http.HandlerFunc{
 	DirRSILA2:     makeHandler(DirRSILA2, func(p string) bool { return srgGetTeletexPage(p, "RSILA2", DirRSILA2) }),
 	DirNOSNEWS:    makeHandler(DirNOSNEWS, nosnewsGetTeletexPage),
 	DirFORUM64:    makeHandler(DirFORUM64, forum64GetTeletexPage),
+	DirMTVATXT:    makeHandler(DirMTVATXT, mtvatxtGetTeletexPage),
+	DirBMN1:       makeHandler(DirBMN1, bmn1GetTeletexPage),
 }
 
 // Teletext control codes (range 0x00..0x1F); Alpha is a regular character; a mosaic is a graphics character
@@ -259,6 +284,70 @@ func startCSVLogger() {
 	}
 }
 
+// Debounces the /downloads/ log line. A single LOAD"HTTP://...",8 on the C64 side turns into many
+// small HTTP requests as Meatloaf/the KERNAL pull the .prg in chunks (visible as a burst of
+// identical-looking "Client IP" lines from ipLoggingMiddleware within the same second) - this
+// collapses a whole burst from one client for one file into a single log line instead of one per
+// chunk. Keyed by client IP + filename so concurrent downloads of different files (or by different
+// clients) still each get their own line.
+var (
+	downloadLogMu   sync.Mutex
+	downloadLogSeen = map[string]time.Time{}
+)
+
+// How long a gap between chunk requests from the same client+file is still considered "the same
+// download". Each new chunk slides the window forward, so a download that takes longer than this
+// only logs once as long as no single gap between its chunks exceeds it.
+const downloadLogCooldown = 30 * time.Second
+
+// logDownloadOnce logs one line (stdout, for journalctl/live tailing) and one CSV entry (via the
+// existing logChan/pp-history.csv mechanism, so downloads show up alongside page requests) the
+// first time a given client+file pair is seen, then stays quiet for downloadLogCooldown.
+func logDownloadOnce(clientIP, filename string) {
+	key := clientIP + "|" + filename
+	now := time.Now()
+
+	downloadLogMu.Lock()
+	last, seen := downloadLogSeen[key]
+	downloadLogSeen[key] = now // slide the window forward on every chunk, seen or not
+	downloadLogMu.Unlock()
+
+	if seen && now.Sub(last) < downloadLogCooldown {
+		return
+	}
+
+	fmt.Printf("%v Download: %-30s | Client IP: %s\n", now.Format("2006-01-02 15:04:05"), filename, clientIP)
+
+	select {
+	case logChan <- LogEntry{
+		Date:      now.Format("2006-01-02"),
+		Time:      now.Format("15:04:05"),
+		IPAddress: clientIP,
+		Station:   StationDownloads,
+		Page:      filename,
+	}:
+	default:
+		fmt.Println("CSV Logger warning: log queue is full, entry skipped.")
+	}
+}
+
+// cleanupDownloadLog periodically forgets old entries from downloadLogSeen so it doesn't grow
+// forever from one-off bot/scanner requests over the server's lifetime.
+func cleanupDownloadLog() {
+	ticker := time.NewTicker(time.Hour)
+	defer ticker.Stop()
+	for range ticker.C {
+		cutoff := time.Now().Add(-downloadLogCooldown * 2)
+		downloadLogMu.Lock()
+		for k, t := range downloadLogSeen {
+			if t.Before(cutoff) {
+				delete(downloadLogSeen, k)
+			}
+		}
+		downloadLogMu.Unlock()
+	}
+}
+
 // getClientIP extracts the real IP address from the request
 func getClientIP(r *http.Request) string {
 	// Check for X-Forwarded-For proxy header first
@@ -280,9 +369,15 @@ func getClientIP(r *http.Request) string {
 	return ip
 }
 
-// logs the client IP for every incoming request
+// logs the client IP for every incoming request, except /downloads/ - that route already gets its
+// own deduplicated "Download: ..." line via logDownloadOnce (see main()), and a .prg fetch turns
+// into many small chunk/range requests that would otherwise spam one raw "Client IP" line each.
 func ipLoggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/downloads/") {
+			next.ServeHTTP(w, r)
+			return
+		}
 		now := time.Now()
 		clientIP := getClientIP(r)
 		// Log the IP along with the request method and path
@@ -343,7 +438,17 @@ If you do not have one, you can request one here: https://developer.yle.fi/en/in
 	mux.HandleFunc("/UD/", udHandler)
 	mux.HandleFunc("/ud/", udHandler)
 
+	downloadsFS := http.StripPrefix("/downloads/", http.FileServer(http.Dir("downloads")))
+	mux.Handle("/downloads/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		filename := strings.TrimPrefix(r.URL.Path, "/downloads/")
+		if filename != "" {
+			logDownloadOnce(getClientIP(r), filename)
+		}
+		downloadsFS.ServeHTTP(w, r)
+	}))
+
 	go startCSVLogger()
+	go cleanupDownloadLog()
 
 	syncChunkytextRepo()
 	go func() {

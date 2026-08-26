@@ -240,6 +240,80 @@ func sparkGetTeletexPage(pageNr string) bool {
 	return true
 }
 
+// --- HBN Teksti-TV ---
+
+func hbntekstiGetTeletexPage(pageNr string) bool {
+	parts := strings.Split(pageNr, "-")
+	url := fmt.Sprintf("https://feeds.bmn-online.nl/svn/teletext/hbn1/P%s.tti", parts[0])
+	logFetchingPage(url)
+	resp, err := http.Get(url)
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		fmt.Println("HTTP Error: Could not retrieve page", pageNr, "Status:", resp.StatusCode)
+		return true
+	}
+
+	rows, nav := parseTTIRows(resp.Body, parts[0], parts[1], true)
+	ps, ns, ct := getPrevNextSubpage(parts[0], nav)
+
+	var output []byte
+	output = append(output, []byte(fmt.Sprintf(
+		"pn=p_\npn=n_\n%v%v%v<pre>",
+		ps, ns, ct))...)
+
+	// Re-create header
+	copy(rows[0][1:], fmt.Sprintf("      \x07%s HBN TEKSTI-TV%s", parts[0], getHBNDate()))
+
+	for _, r := range rows {
+		output = append(output, r...)
+	}
+
+	output = append(output, []byte("</pre>")...)
+	savePage(DirHBNTEKSTI, pageNr, output)
+	return true
+}
+
+// --- BMN1 Bollentekst ---
+
+func bmn1GetTeletexPage(pageNr string) bool {
+	parts := strings.Split(pageNr, "-")
+	url := fmt.Sprintf("https://feeds.bmn-online.nl/svn/teletext/bollentekst/P%s.tti", parts[0])
+	logFetchingPage(url)
+	resp, err := http.Get(url)
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		fmt.Println("HTTP Error: Could not retrieve page", pageNr, "Status:", resp.StatusCode)
+		return true
+	}
+
+	rows, nav := parseTTIRows(resp.Body, parts[0], parts[1], false)
+	ps, ns, ct := getPrevNextSubpage(parts[0], nav)
+
+	var output []byte
+	output = append(output, []byte(fmt.Sprintf(
+		"pn=p_\npn=n_\n%v%v%v<pre>",
+		ps, ns, ct))...)
+
+	// Re-create header
+	copy(rows[0][1:], fmt.Sprintf("         \x07%s\x02BMN1%s", parts[0], getBMNDate()))
+
+	for _, r := range rows {
+		output = append(output, r...)
+	}
+
+	output = append(output, []byte("</pre>")...)
+	savePage(DirBMN1, pageNr, output)
+	return true
+}
+
 var subpage byte
 var fullDoubleHeightRow bool
 
@@ -460,4 +534,16 @@ func getTeefaxURL(pageID string) (string, error) {
 			}
 		}
 	}
+}
+
+func getBMNDate() string {
+	now := time.Now()
+	days := map[string]string{"Sun": "zo", "Mon": "ma", "Tue": "di", "Wed": "wo", "Thu": "do", "Fri": "vr", "Sat": "za"}
+	yearStr := strconv.Itoa(now.Year())
+	return fmt.Sprintf("\x07%s %02d.%02d.%s %s", days[now.Format("Mon")], now.Day(), now.Month(), yearStr[2:], now.Format("15:04:05"))
+}
+
+func getHBNDate() string {
+	now := time.Now()
+	return fmt.Sprintf("\x07%02d.%02d.%s", now.Day(), now.Month(), now.Format("15:04:05"))
 }

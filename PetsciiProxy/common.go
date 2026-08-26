@@ -108,7 +108,11 @@ func scanPageLinks(body []byte) string {
 				}
 				if next == ',' || next == '.' {
 					// a space or teletext control code after the . / , is valid
-					if rowBytes[endIdx+1] == ' ' || rowBytes[endIdx+1] < 0x20 {
+					if endIdx+1 >= len(rowBytes) {
+						// the . / , is the last character in the row - nothing follows to check,
+						// treat like running off the row (see the col==37 case above)
+						validSuffix = true
+					} else if rowBytes[endIdx+1] == ' ' || rowBytes[endIdx+1] < 0x20 {
 						validSuffix = true
 					} else {
 						if endIdx+4 > len(rowBytes) {
@@ -376,26 +380,10 @@ func logPageRequest(station string, page string) {
 	fmt.Printf("Request: %-12s %s | ", station, page)
 }
 
-// logFetchingPage completes the "Request: STATION page | " line that logPageRequest just printed
-// (deliberately without its own trailing newline) - the two calls are meant to always run back to
-// back for a given request, forming one line together. This only holds for stations that fetch (or
-// at least decide whether to fetch) synchronously as part of handling the request itself; for
-// localOnlyStations, whose lazy poll may or may not run on any given request, makeHandler always
-// calls this immediately after fetch() regardless, so the line is guaranteed to complete every time.
-// Any fetch that happens independently of a specific request (a background poll) must use
-// logBackgroundPoll instead - see there for why.
 func logFetchingPage(url string) {
 	fmt.Println(url)
 }
 
-// logBackgroundPoll logs a lazily-triggered feed refresh (NOSNEWS, FORUM64) as its own complete,
-// self-contained line. Unlike logFetchingPage, this must never be used to "complete" a pending
-// logPageRequest prefix: a poll only happens on some requests (whichever one's turn it is once the
-// poll interval has elapsed) and never on most others, so relying on it to finish another line left
-// that line dangling with no trailing newline on every request that didn't happen to trigger a poll
-// - and an unterminated Printf just sits in the output stream until the next unrelated write on any
-// goroutine gets appended straight after it, producing exactly the garbled, glued-together lines
-// (sometimes with a different request's Client IP tacked on) that prompted this split.
 func logBackgroundPoll(station, url string) {
 	fmt.Printf("Poll: %-12s | %s\n", station, url)
 }

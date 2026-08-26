@@ -505,6 +505,10 @@ func formatNOSShortDate(t time.Time) string {
 	if t.IsZero() {
 		return ""
 	}
+	now := time.Now()
+	if t.Year() == now.Year() && t.Month() == now.Month() && t.Day() == now.Day() {
+		return fmt.Sprintf("%d:%02d", t.Hour(), t.Minute())
+	}
 	return fmt.Sprintf("%d %s,%d:%02d", t.Day(), nosNewsMonths[t.Month()-1], t.Hour(), t.Minute())
 }
 
@@ -873,19 +877,23 @@ func renderIndexPage(cat *nosNewsCategory, sub int) []byte {
 	pColorCol := pCol - 1
 	capacity := contentEnd - hRow
 
-	// <shortdate> is optional and placed before <headline> on that same row
 	const sdToken = "<shortdate>"
-	sdCol, sdFound := 0, false
-	if _, c, _, f := findMarkerInRows(tpl, hRow, hRow+1, sdToken); f {
-		sdCol, sdFound = c, true
+	sdCol, sdPrefix, sdFound := 0, byte(0), false
+	var decoration []byte // template bytes between <shortdate> and <headline>
+	if sdRow, c, p, f := findMarkerInRows(tpl, hRow, hRow+1, sdToken); f {
+		sdCol, sdPrefix, sdFound = c, p, true
+		tokenEnd := sdCol + len(sdToken)
+		if tokenEnd > hCol {
+			tokenEnd = hCol
+		}
+		decoStart := tokenEnd
+		for decoStart < hCol && tpl[sdRow*40+decoStart] == 0x20 {
+			decoStart++
+		}
+		decoration = append([]byte{}, tpl[sdRow*40+decoStart:sdRow*40+hCol]...)
 	}
 
-	// The first line has less room when <shortdate> shares its row; every line after it starts
-	// flush at column 1 instead of hCol, so it gets the (wider) rest-of-line width instead.
-	firstWidth := pColorCol - hCol
-	if firstWidth < 5 {
-		firstWidth = 5
-	}
+	// Room every line after the first keeps free at the row's right edge for the page-number label.
 	restWidth := pColorCol - 1
 	if restWidth < 5 {
 		restWidth = 5
@@ -894,6 +902,23 @@ func renderIndexPage(cat *nosNewsCategory, sub int) []byte {
 	// Each article is its own group: its headline lines plus the page-number line stay together as one atomic unit
 	var groups [][][]byte
 	for _, a := range cat.store.list() {
+		dateBytes := []byte(formatNOSShortDate(a.pubTime))
+
+		// lineHCol is where this article's headline text starts on its first line: right after its own
+		// date/time string and the decoration that follows it. Without a <shortdate> marker it's just hCol,
+		// same as every other line.
+		lineHCol := hCol
+		if sdFound {
+			lineHCol = sdCol + len(dateBytes) + len(decoration)
+			if lineHCol > 40 {
+				lineHCol = 40
+			}
+		}
+		firstWidth := pColorCol - lineHCol
+		if firstWidth < 5 {
+			firstWidth = 5
+		}
+
 		lines := wrapTeletextVariable(a.title, firstWidth, restWidth)
 		if len(lines) == 0 {
 			continue
@@ -903,27 +928,22 @@ func renderIndexPage(cat *nosNewsCategory, sub int) []byte {
 			row := blankTeletextRow()
 			switch {
 			case i == 0 && sdFound:
-				copy(row[:hCol], tpl[hRow*40:hRow*40+hCol])
-				tokenEnd := sdCol + len(sdToken)
-				if tokenEnd > hCol {
-					tokenEnd = hCol
+				if sdCol > 0 {
+					row[sdCol-1] = sdPrefix
 				}
-				decoStart := tokenEnd
-				for decoStart < hCol && tpl[hRow*40+decoStart] == 0x20 {
-					decoStart++
-				}
-				decoration := append([]byte{}, tpl[hRow*40+decoStart:hRow*40+hCol]...)
-				for k := sdCol; k < hCol; k++ {
-					row[k] = 0x20
-				}
-				copy(row[decoStart:hCol], decoration)
-				dateBytes := []byte(formatNOSShortDate(a.pubTime))
 				dateEnd := sdCol + len(dateBytes)
-				if dateEnd > decoStart {
-					dateEnd = decoStart
+				if dateEnd > 40 {
+					dateEnd = 40
 				}
 				copy(row[sdCol:dateEnd], dateBytes)
-				copy(row[hCol:], []byte(line))
+				decoEnd := dateEnd + len(decoration)
+				if decoEnd > 40 {
+					decoEnd = 40
+				}
+				copy(row[dateEnd:decoEnd], decoration)
+				if decoEnd < 40 {
+					copy(row[decoEnd:], []byte(line))
+				}
 			case i == 0:
 				row[0] = hPrefix
 				copy(row[hCol:], []byte(line))

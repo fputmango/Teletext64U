@@ -5,14 +5,14 @@
 | Key | Description |
 | :--- | :--- |
 |CLR HOME|Go to favorite start page |
-|+| Go to current page +1 / next page|
+|+ or =| Go to current page +1 / next page|
 |-| Go to current page -1 / previous page|
-|↑| Step back through visited pages|
+|↑ or Q| Step back through visited pages|
 |←| Go back to the WiC64 Portal (only supported in the standalone WiC64 PRG version)|
 |, | Subpage up |
 |. | Subpage down |
-|Cursor keys/WASD | Quick Navgiation |
-|RETURN/E | Select and go to pagenumber |
+|Cursor keys or WASD | Quick Navgiation |
+|RETURN or E | Select and go to pagenumber |
 |R | Refresh current teletext page |
 |Space | Stop/Continue auto rotating subpages |
 |B | Bold font |
