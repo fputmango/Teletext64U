@@ -4,15 +4,16 @@
 
 ### Added
 - The Meatloaf editon has it's own short code now. It can be loaded like this: LOAD "ML:TELETEXT64",8
+
 New stations:
 - BMN1 Bollentekst (The Netherlands)
 - HBN Teksti-TV (Finland) - Helsinki Broadcast Network: A recreation of Teksti-TV in the 1990s.
 - MTVA Teletext (Hungary)
 
 ### Changed
--The boot screen of the Meatloaf edition is now similar to that of the single-PRG WiC64 edition.
--The Meatloaf edition now checks the device number from which the program was loaded.
--Changed the way local national characters are handled. Separate font files have been created for the G2 character sets. A full ETS 300 706 teletext implementation was not possible due to the C64's memory limitations, so the implementation is loosely based on G2. As a result, all specific Hungarian characters are now supported.
+- The boot screen of the Meatloaf edition is now similar to that of the single-PRG WiC64 edition.
+- The Meatloaf edition now checks the device number from which the program was loaded.
+- Changed the way local national characters are handled. Separate font files have been created for the G2 character sets. A full ETS 300 706 teletext implementation was not possible due to the C64's memory limitations, so the implementation is loosely based on G2. As a result, all specific Hungarian characters are now supported.
 
 ### Fixed
 - Corrected an extended ASCII mapping and a wrongly skipped mosaic/held-char check.
