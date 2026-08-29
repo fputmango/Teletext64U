@@ -42,6 +42,8 @@ Teletext 64 Ultimate has its own dedicated server at petsciiproxy.nl, so you don
 |RSI LA 2 |Switzerland, Italian |
 |NOS Nieuws |The Netherlands (RSS feed) |
 |Forum64 |Germany (RSS feed) |
+|BMN1 Bollentekst |The Netherlands |
+|HBN Teksti-TV |Finland |
 |MTVA Teletext |Hungary |
  
 My mission: add as many Teletext services as possible. So let me know if you have any wishes.
