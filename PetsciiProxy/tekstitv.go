@@ -100,15 +100,18 @@ func tekstiGetTeletexPage(pageNr string) bool {
 		ps, ns, _ = getPrevNextSubpage(parts[0], nav)
 	}
 
+	// to do: add the fastext link text labels on row 24
 	var output []byte
 	output = append(output, []byte(fmt.Sprintf(
-		"%v%vftl=%v-0\nftl=%v-0\nftl=%v-0\nftl=%v-0\n<pre>", ps, ns,
+		"%v%vftl=%v\nftl=%v\nftl=%v\nftl=%v\n<pre>", ps, ns,
 		"100", "200", "300", "400"))...)
 
 	headerRow := bytes.Repeat([]byte{0x20}, 40)
 	now := time.Now()
 	copy(headerRow[7:], fmt.Sprintf("\x07%s YLE TEKSTI-TV %02d.%02d.%s", parts[0], now.Day(), 3, now.Format("15:04:05")))
 	output = append(output, headerRow...)
+
+	copy(rows[23][0:], "\x01Etusvi\x02Urheilu\x03TV-ohjelmat\x06Saa ja liikenne")
 
 	for _, r := range rows {
 		output = append(output, r...)
@@ -199,6 +202,7 @@ func parseTEKSTIRows(body io.ReadCloser, subpageStr string) ([][]byte, Navignati
 			}
 		}
 	}
+
 	return pageBuffer, nav, nil
 }
 

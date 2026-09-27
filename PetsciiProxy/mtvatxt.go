@@ -128,7 +128,7 @@ func mtvatxtGetTeletexPage(pageNr string) bool {
 
 	var output []byte
 	output = append(output, []byte(fmt.Sprintf(
-		"%v%vftl=101-0\nftl=175-0\nftl=200-0\nftl=300-0\n<pre>", ps, ns))...)
+		"%v%vftl=101\nftl=175\nftl=200\nftl=300\n<pre>", ps, ns))...)
 	for _, r := range pageBuffer {
 		output = append(output, r...)
 	}
@@ -474,7 +474,7 @@ func parseMtvaTxtRows(body []byte, page string) [][]byte {
 
 	// generic detection of a page that should be made double height
 	page100fixed := false
-	if pageBuffer[1][0] == 0x07 && pageBuffer[1][1] == 0x20 && pageBuffer[1][2] == 0x20 && pageBuffer[1][3] == 0x20 &&
+	if pageBuffer[1][0] == 0x07 && pageBuffer[1][1] == 0x20 && pageBuffer[1][2] == 0x20 && pageBuffer[1][3] == 0x20 && pageBuffer[1][4] == 0x20 &&
 		pageBuffer[2][0] == 0x07 && pageBuffer[2][1] == 0x20 && pageBuffer[2][2] == 0x20 && pageBuffer[2][3] == 0x20 &&
 		pageBuffer[3][0] == 0x07 && pageBuffer[3][1] == 0x20 && pageBuffer[3][2] == 0x20 && pageBuffer[3][3] == 0x20 {
 		page100fixed = true

@@ -67,7 +67,7 @@ func svttextGetTeletexPage(pageNr string) bool {
 
 	var output []byte
 	output = append(output, []byte(fmt.Sprintf(
-		"pn=p_\npn=n_\n%v%vftl=100-0\nftl=300-0\nftl=400-0\nftl=700-0\n<pre>",
+		"pn=p_\npn=n_\n%v%vftl=100\nftl=300\nftl=400\nftl=700\n<pre>",
 		ps, ns))...)
 
 	// create row 0 / header line
@@ -83,21 +83,13 @@ func svttextGetTeletexPage(pageNr string) bool {
 	copy(row0[start+15:], stringToLatin1Bytes(dt))
 	row0[start+25] = byte(TCC_ALPHA_YELLOW)
 
-	rows[23][0] = TCC_ALPHA_RED
 	// 2 variants of the fastext layout: If we have subpages, we need some room for the
 	// subpage indicator bottom right
 	if nav.numberOfSubpages > 1 {
-		copy(rows[23][1:], "Nyheter  Sport  V\x7Bder  Inneh\x7Dll")
-		rows[23][9] = TCC_ALPHA_GREEN
-		rows[23][16] = TCC_ALPHA_YELLOW
-		rows[23][22] = TCC_ALPHA_CYAN
+		copy(rows[23][0:], "\x01Nyheter \x02Sport \x03V\x7Bder \x06Inneh\x7Dll")
 		rows[23][32] = TCC_ALPHA_WHITE
 	} else {
-		rows[23][0] = TCC_ALPHA_RED
-		copy(rows[23][1:], "Nyheter    Sport     V\x7Bder     Inneh\x7Dll")
-		rows[23][11] = TCC_ALPHA_GREEN
-		rows[23][21] = TCC_ALPHA_YELLOW
-		rows[23][28] = TCC_ALPHA_CYAN
+		copy(rows[23][0:], "\x01Nyheter   \x02Sport    \x03V\x7Bder    \x06Inneh\x7Dll")
 	}
 
 	if subPageIndicator != "" && len(rows) > 0 {

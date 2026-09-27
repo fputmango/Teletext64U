@@ -16,9 +16,7 @@ import (
 	"golang.org/x/net/html"
 )
 
-
 var tagRegex = regexp.MustCompile(`\{([A-Za-z0-9]+)\}`)
-
 
 // --- ZDF-TEXT ---
 
@@ -28,7 +26,6 @@ func evalUnary(jsSnippet string) int {
 	ones := strings.Count(jsSnippet, "!![]") + strings.Count(jsSnippet, "!+[]")
 	return ones
 }
-
 
 func extractNumber(body, variableName string) int {
 	// Finds the pattern: s=+((...)+(...)...)
@@ -49,7 +46,6 @@ func extractNumber(body, variableName string) int {
 	val, _ := strconv.Atoi(resultStr)
 	return val
 }
-
 
 func setHeaders(req *http.Request, referer string) {
 	h := req.Header
@@ -72,7 +68,6 @@ func setHeaders(req *http.Request, referer string) {
 		h.Set("Sec-Fetch-Site", "same-origin")
 	}
 }
-
 
 func zdftextGetTeletexPage(pageNr string, zdfStation string, dirStation string) bool {
 	var url string
@@ -215,20 +210,20 @@ func zdftextGetTeletexPage(pageNr string, zdfStation string, dirStation string) 
 	// Note: the ftl - fastext links are fixed for now; it could be made dynamic in a future release
 	// Übersicht (100), Nachrichten (112), Sport (200), Wetter (170)
 	// aka: Overview, News, Sport, Weather
-	ftl2 := "112-0"
-	ftl3 := "200-0"
+	ftl2 := "112"
+	ftl3 := "200"
 	if strings.Contains(zdfStation, "info") || strings.Contains(zdfStation, "neo") {
-		ftl3 = "300-0"
+		ftl3 = "300"
 	}
-	ftl4 := "170-0"
+	ftl4 := "170"
 	if strings.Contains(zdfStation, "3sat") {
-		ftl2 = "500-0"
-		ftl3 = "300-0"
-		ftl4 = "400-0"
+		ftl2 = "500"
+		ftl3 = "300"
+		ftl4 = "400"
 	}
 	var output []byte
 	output = append(output, []byte(fmt.Sprintf(
-		"%v%v%v%vftl=100-0\nftl=%v\nftl=%v\nftl=%v\n<pre>", pp, np, ps, ns, ftl2, ftl3, ftl4))...)
+		"%v%v%v%vftl=100\nftl=%v\nftl=%v\nftl=%v\n<pre>", pp, np, ps, ns, ftl2, ftl3, ftl4))...)
 
 	for _, r := range rows {
 		output = append(output, r...)
@@ -238,7 +233,6 @@ func zdftextGetTeletexPage(pageNr string, zdfStation string, dirStation string) 
 	savePage(dirStation, pageNr, output)
 	return true
 }
-
 
 func parseZDFRows(body io.ReadCloser, zdfStation string, pageNr string) ([][]byte, NavignationInfo) {
 	defer body.Close()
@@ -597,7 +591,6 @@ func parseZDFRows(body io.ReadCloser, zdfStation string, pageNr string) ([][]byt
 	return pageBuffer, nav
 }
 
-
 func zdfExtractColors(token html.Token) (fg, bg string, isMosaic bool) {
 	for _, attr := range token.Attr {
 		if attr.Key != "class" {
@@ -615,7 +608,6 @@ func zdfExtractColors(token html.Token) (fg, bg string, isMosaic bool) {
 	}
 	return
 }
-
 
 func zdfHexToTCC(hex string) byte {
 	if len(hex) < 6 {
@@ -651,11 +643,9 @@ func zdfHexToTCC(hex string) byte {
 	}
 }
 
-
 func getZdfDate() string {
 	now := time.Now()
 	days := map[string]string{"Sun": "So", "Mon": "Mo", "Tue": "Di", "Wed": "Mi", "Thu": "Do", "Fri": "Fr", "Sat": "Sa"}
 	yearStr := strconv.Itoa(now.Year())
 	return fmt.Sprintf("\x02%s %02d.%02d.%s \x03%s", days[now.Format("Mon")], now.Day(), now.Month(), yearStr[2:], now.Format("15:04:05"))
 }
-

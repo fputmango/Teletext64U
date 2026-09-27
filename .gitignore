@@ -46,6 +46,10 @@
 !/PetsciiProxy/dist/petsciiproxy-windows.exe
 !/PetsciiProxy/dist/petsciiproxy-raspberrypi-32bit
 !/PetsciiProxy/dist/petsciiproxy-raspberrypi-1B
+!/PetsciiProxy/drivers/
+!/PetsciiProxy/drivers/c64-1351.mou
+!/PetsciiProxy/fonts/
+!/PetsciiProxy/fonts/*.bin
 
 !/Teletext64U/
 !/Teletext64U/target/

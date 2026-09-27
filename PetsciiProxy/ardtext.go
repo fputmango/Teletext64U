@@ -109,7 +109,7 @@ func ardtextGetTeletexPage(pageNr string) bool {
 	// and detect something like this: <div id="output_unterseite" class="subpageCounter">1/3</div>
 	var output []byte
 	output = append(output, []byte(fmt.Sprintf(
-		"%v%v%vftl=100-0\nftl=200-0\nftl=171-0\nftl=710-0\n<pre>",
+		"%v%v%vftl=100\nftl=200\nftl=171\nftl=710\n<pre>",
 		ps, ns, ct))...)
 
 	row0 := make([]byte, 40)
@@ -359,11 +359,7 @@ func parseARDRows(r io.Reader, correctFirstRows bool) [][]byte {
 		Of course, this could be made more fancy with dynamic info from the HTML page in the future.
 	*/
 	resetRow()
-	row[0] = TCC_ALPHA_RED
-	copy(row[1:], "Startseite    Sport     Wetter    B\xF6rse") // Börse
-	row[12] = TCC_ALPHA_GREEN
-	row[22] = TCC_ALPHA_YELLOW
-	row[32] = TCC_ALPHA_CYAN
+	copy(row[0:], "\x01Startseite   \x02Sport    \x03Wetter   \x06B\xF6rse") // Börse
 	rows = append(rows, row)
 
 	/*	if correctFirstRows {

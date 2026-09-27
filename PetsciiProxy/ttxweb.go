@@ -52,10 +52,10 @@ func hrtextGetTeletexPage(pageNr string) bool {
 
 	pp, np = buildPageNavDirectives(nav.prevPage, nav.nextPage)
 	var ftl FastextLinks
-	ftl.ftl1 = "102-0"
-	ftl.ftl2 = "112-0"
-	ftl.ftl3 = "170-0"
-	ftl.ftl4 = "200-0"
+	ftl.ftl1 = "102"
+	ftl.ftl2 = "112"
+	ftl.ftl3 = "170"
+	ftl.ftl4 = "200"
 
 	var output []byte
 	output = append(output, []byte(fmt.Sprintf(
@@ -133,10 +133,10 @@ func swrGetTeletexPage(pageNr string, station string, dirStation string) bool {
 	pp, np = buildPageNavDirectives(nav.prevPage, nav.nextPage)
 
 	var ftl FastextLinks
-	ftl.ftl1 = "101-0"
-	ftl.ftl2 = "112-0"
-	ftl.ftl3 = "151-0"
-	ftl.ftl4 = "200-0"
+	ftl.ftl1 = "101"
+	ftl.ftl2 = "112"
+	ftl.ftl3 = "151"
+	ftl.ftl4 = "200"
 
 	var output []byte
 	output = append(output, []byte(fmt.Sprintf(

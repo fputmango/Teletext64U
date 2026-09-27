@@ -89,7 +89,8 @@ func scanPageLinks(body []byte) string {
 				validPrefix = true
 			} else {
 				prev := rowBytes[startIdx-1]
-				if prev == ' ' || prev == 'p' || prev == 'P' || prev == '>' || prev == '-' || prev == ',' || prev == '.' || prev == '/' || prev < 32 {
+				// 0x5D is the Italian right arrow character; it is being used as a seperator on RAI TELEVIDEO page 401 for example
+				if prev == ' ' || prev == 'p' || prev == 'P' || prev == '>' || prev == '-' || prev == ',' || prev == '.' || prev == '/' || prev == 0x5D || prev < 32 {
 					validPrefix = true
 				}
 			}
@@ -103,7 +104,7 @@ func scanPageLinks(body []byte) string {
 				validSuffix = true
 			} else {
 				next := rowBytes[endIdx]
-				if next == ' ' || next == ',' || next == '.' || next == '-' || next == '/' || next == '\n' || next < 32 {
+				if next == ' ' || next == ',' || next == '.' || next == '-' || next == '/' || next == '\n' || next == 0x5D || next < 32 {
 					validSuffix = true
 				}
 				if next == ',' || next == '.' {
@@ -176,8 +177,66 @@ func scanPageLinks(body []byte) string {
 	return pageLinks.String()
 }
 
+var ftlRegex = regexp.MustCompile(`(?m)^(ftl=[0-9A-Za-z]{3}).*$`) // Find 3 digit page numbers and also page numbers like this: 10A.
+
+// scanFtlPositions scans teletext row 24 (the Fastext link row - always this row, no
+// exceptions) for up to 4 colored text segments. A segment starts right after ANY
+// alpha-color control code (0x00-0x07 - any one, not just red/green/yellow/cyan
+// specifically, since a new color code always marks the start of the next link).
+// The raw end of a segment is right before the next color code (or the end of the row
+// for the last segment), but trailing spaces before that point are trimmed off - a label
+// can be one or more words, so rather than guess at word boundaries, this just walks
+// backward from the raw end until it hits a non-space character. That means the
+// highlighted width covers exactly the label text, not the padding before the next link.
+// Returns up to 4 (col, width) pairs, in left-to-right order - this order lines up with
+// the order the ftl= lines already appear in the header, since every station either
+// constructs row 24 to match its own ftl= values directly (dr.go, zdftext.go, ardtext.go),
+// or - for NOS-TT - passes both through unmodified from the broadcaster, which guarantees
+// the same consistency natively.
+func scanFtlPositions(body []byte) [][2]int {
+	const row = 24
+	rowStart := row * 40
+	if len(body) < rowStart+40 {
+		return nil
+	}
+	rowBytes := body[rowStart : rowStart+40]
+
+	var positions [][2]int
+	segStart := -1
+	closeSegment := func(rawEnd int) {
+		end := rawEnd
+		for end > segStart && rowBytes[end-1] == ' ' {
+			end--
+		}
+		width := end - segStart
+		if width < 0 {
+			width = 0
+		}
+		positions = append(positions, [2]int{segStart, width})
+	}
+
+	for col := 0; col < 40 && len(positions) < 4; col++ {
+		if rowBytes[col] <= 0x07 { // any alpha-color control code
+			if segStart >= 0 {
+				closeSegment(col)
+			}
+			segStart = col + 1
+		}
+	}
+	if segStart >= 0 && segStart < 40 && len(positions) < 4 {
+		closeSegment(40)
+	}
+	return positions
+}
+
 // insertPageLinks scans the rendered page body for teletext page number references and, if any are found,
 // splices "lnk=nnn,rr,cc" lines into the header block right before <pre>.
+// It also rewrites each ftl= line to "ftl=xxx,cc,ww" - column and width of that Fastext
+// link's text on row 24 (row itself is fixed at 24, so it's not repeated) - so
+// Teletext64U can highlight it on hover the same way it already does for lnk= links.
+// This replaces the old '-0' stripping (NOS-TT was the only station still emitting that
+// suffix): any trailing content after the 3-char ID is discarded either way and replaced
+// with fresh position data.
 func insertPageLinks(output []byte) []byte {
 	preTag := []byte("<pre>")
 	postTag := []byte("</pre>")
@@ -186,6 +245,7 @@ func insertPageLinks(output []byte) []byte {
 	if preIdx == -1 {
 		return output
 	}
+
 	bodyStart := preIdx + len(preTag)
 
 	postIdx := bytes.Index(output[bodyStart:], postTag)
@@ -194,13 +254,33 @@ func insertPageLinks(output []byte) []byte {
 	}
 	body := output[bodyStart : bodyStart+postIdx]
 
+	ftlPositions := scanFtlPositions(body)
+	ftlIndex := 0
+	header := output[0:preIdx]
+	header = ftlRegex.ReplaceAllFunc(header, func(match []byte) []byte {
+		id := match[:7] // "ftl=" + 3-char ID, fixed width - group 1 is always this prefix
+		var result []byte
+		if ftlIndex < len(ftlPositions) {
+			col, width := ftlPositions[ftlIndex][0], ftlPositions[ftlIndex][1]
+			result = []byte(fmt.Sprintf("%s,%02d,%02d", id, col, width))
+		} else {
+			result = id // no matching color segment found on row 24 - keep just the target page ID
+		}
+		ftlIndex++
+		return result
+	})
+
 	pageLinks := scanPageLinks(body)
 	if pageLinks == "" {
-		return output
+		result := make([]byte, 0, len(header)+len(output)-preIdx)
+		result = append(result, header...)
+		result = append(result, output[preIdx:]...)
+		return result
 	}
 
 	result := make([]byte, 0, len(output)+len(pageLinks))
-	result = append(result, output[:preIdx]...)
+	//result = append(result, output[:preIdx]...)
+	result = append(result, header...)
 	result = append(result, []byte(pageLinks)...)
 	result = append(result, output[preIdx:]...)
 	return result

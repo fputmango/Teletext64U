@@ -159,10 +159,10 @@ func srgGetTeletexPage(pageNr string, channel string, dirStation string) bool {
 	}
 
 	var ftl FastextLinks
-	ftl.ftl1 = "101-0"
-	ftl.ftl2 = "180-0"
-	ftl.ftl3 = "500-0"
-	ftl.ftl4 = "700-0"
+	ftl.ftl1 = "101"
+	ftl.ftl2 = "180"
+	ftl.ftl3 = "500"
+	ftl.ftl4 = "700"
 
 	var output []byte
 	output = append(output, []byte(fmt.Sprintf(

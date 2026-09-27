@@ -16,7 +16,6 @@ import (
 	"golang.org/x/net/html"
 )
 
-
 // --- DR TEKST-TV ---
 
 func drteksttvGetTeletexPage(pageNr string) bool {
@@ -59,7 +58,7 @@ func drteksttvGetTeletexPage(pageNr string) bool {
 	// aka: nieuws, sport, TV, weather
 	var output []byte
 	output = append(output, []byte(fmt.Sprintf(
-		"%v%v%v%vftl=110-0\nftl=200-0\nftl=300-0\nftl=400-0\n<pre>", pp, np, ps, ns))...)
+		"%v%v%v%vftl=110\nftl=200\nftl=300\nftl=400\n<pre>", pp, np, ps, ns))...)
 
 	for _, r := range rows {
 		output = append(output, r...)
@@ -69,7 +68,6 @@ func drteksttvGetTeletexPage(pageNr string) bool {
 	savePage(DirDR, pageNr, output)
 	return true
 }
-
 
 func parseDRRows(body io.ReadCloser, pageNr string, subPageNr string) ([][]byte, NavignationInfo, error) {
 	defer body.Close()
@@ -1976,4 +1974,3 @@ func parseDRRows(body io.ReadCloser, pageNr string, subPageNr string) ([][]byte,
 
 	return pageBuffer, nav, nil
 }
-

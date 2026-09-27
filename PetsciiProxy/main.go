@@ -86,8 +86,10 @@ Why transform to the NOS-TT format? Basically to keep things simple for the Tele
 package main
 
 import (
+	"embed"
 	"flag"
 	"fmt"
+	"io/fs"
 	"net"
 	"net/http"
 	"os"
@@ -97,47 +99,63 @@ import (
 	"time"
 )
 
+// Fonts and the mouse driver are stable, rarely-changing binary assets baked
+// straight into the executable at build time - a self-hosted instance built
+// from this source tree always has them, with no separate deploy step and
+// no runtime dependency on petsciiproxy.nl. Contrast with the TELETEXT64
+// .tti source below, which stays on-disk deliberately (see
+// DirTELETEXT64TTI) because it's actively-authored content the maintainer
+// wants to update by just replacing a file, not by rebuilding the binary.
+//
+//go:embed fonts
+var embeddedFontsFS embed.FS
+
+//go:embed drivers
+var embeddedDriversFS embed.FS
+
 // Version
-const pp_version = "2.6.1"
+const pp_version = "2.7.0"
 
 // Supported teletext services
 const (
-	DirNOS        = "NOS-TT"
-	DirARD        = "ARD-TEXT"
-	DirZDF        = "ZDF-TEXT"
-	DirZDFinfo    = "ZDFINFO"
-	DirZDFneo     = "ZDFNEO"
-	Dir3sat       = "3SAT"
-	DirWDR        = "WDR-TEXT"
-	DirORF1       = "ORF1"
-	DirORF2       = "ORF2"
-	DirORF3       = "ORF3"
-	DirORFSport   = "ORFSPORT"
-	DirHR         = "HR-TEXT"
-	DirSWRBW      = "SWR-BW"
-	DirSWRRP      = "SWR-RP"
-	DirCEEFAX     = "CEEFAX"
-	DirTEEFAX     = "TEEFAX"
-	DirTEKSTI     = "TEKSTI-TV"
-	DirHBNTEKSTI  = "HBN-TEKSTI-TV"
-	DirSVT        = "SVT-TEXT"
-	DirDR         = "DR-TEKST-TV"
-	DirCHUNKYTEXT = "CHUNKYTEXT"
-	DirWEBFAX1    = "WEBFAX1"
-	DirWEBFAX2    = "WEBFAX2"
-	DirSPARK      = "SPARK"
-	DirSRF1       = "SRF1"
-	DirSRF2       = "SRF2"
-	DirSRFInfo    = "SRFINFO"
-	DirRTS1       = "RTS1"
-	DirRTS2       = "RTS2"
-	DirRSILA1     = "RSILA1"
-	DirRSILA2     = "RSILA2"
-	DirNOSNEWS    = "NOSNEWS"  // RSS-generated NOS Nieuws pages (Dutch), see nosnews.go
-	DirFORUM64    = "FORUM64"  // RSS-generated forum64.de thread activity (German), see forum64.go
-	DirMTVATXT    = "MTVA-TXT" // teletext.hu, MTVA's official teletext service (Hungarian), see mtvatxt.go
-	DirBMN1       = "BMN1"     // Bollentekst
-	DirUD         = "UD"       // User Directory where user preferences are stored for the stand alone WiC64 edition
+	DirNOS           = "NOS-TT"
+	DirARD           = "ARD-TEXT"
+	DirZDF           = "ZDF-TEXT"
+	DirZDFinfo       = "ZDFINFO"
+	DirZDFneo        = "ZDFNEO"
+	Dir3sat          = "3SAT"
+	DirWDR           = "WDR-TEXT"
+	DirORF1          = "ORF1"
+	DirORF2          = "ORF2"
+	DirORF3          = "ORF3"
+	DirORFSport      = "ORFSPORT"
+	DirHR            = "HR-TEXT"
+	DirSWRBW         = "SWR-BW"
+	DirSWRRP         = "SWR-RP"
+	DirCEEFAX        = "CEEFAX"
+	DirTEEFAX        = "TEEFAX"
+	DirTEKSTI        = "TEKSTI-TV"
+	DirHBNTEKSTI     = "HBN-TEKSTI-TV"
+	DirSVT           = "SVT-TEXT"
+	DirDR            = "DR-TEKST-TV"
+	DirCHUNKYTEXT    = "CHUNKYTEXT"
+	DirWEBFAX1       = "WEBFAX1"
+	DirWEBFAX2       = "WEBFAX2"
+	DirSPARK         = "SPARK"
+	DirSRF1          = "SRF1"
+	DirSRF2          = "SRF2"
+	DirSRFInfo       = "SRFINFO"
+	DirRTS1          = "RTS1"
+	DirRTS2          = "RTS2"
+	DirRSILA1        = "RSILA1"
+	DirRSILA2        = "RSILA2"
+	DirNOSNEWS       = "NOSNEWS"    // RSS-generated NOS Nieuws pages (Dutch), see nosnews.go
+	DirFORUM64       = "FORUM64"    // RSS-generated forum64.de thread activity (German), see forum64.go
+	DirMTVATXT       = "MTVA-TXT"   // teletext.hu, MTVA's official teletext service (Hungarian), see mtvatxt.go
+	DirBMN1          = "BMN1"       // Bollentekst
+	DirUD            = "UD"         // User Directory where user preferences are stored for the stand alone WiC64 edition
+	DirTELETEXT64    = "TELETEXT64" // Teletext 64 Ultimate's own Users's Guide as a Teletext service
+	DirTELETEXT64TTI = "teletext64" // Host folder of the TTI files; deliberate lower case folder name - see teletext64GetTeletexPage in tti.go
 )
 
 // Pseudo-"station" label used in the CSV log / download log line for hits on /downloads/. Not a
@@ -182,6 +200,7 @@ var handlers = map[string]http.HandlerFunc{
 	DirFORUM64:    makeHandler(DirFORUM64, forum64GetTeletexPage),
 	DirMTVATXT:    makeHandler(DirMTVATXT, mtvatxtGetTeletexPage),
 	DirBMN1:       makeHandler(DirBMN1, bmn1GetTeletexPage),
+	DirTELETEXT64: makeHandler(DirTELETEXT64, teletext64GetTeletexPage),
 }
 
 // Teletext control codes (range 0x00..0x1F); Alpha is a regular character; a mosaic is a graphics character
@@ -219,6 +238,9 @@ const (
 	TCC_NEW_BACKGROUND     = 0x1D
 	TCC_HOLD_MOSAICS       = 0x1E
 	TCC_RELEASE_MOSAICS    = 0x1F
+	// Note: these two colour codes don't exist in Teletext level 1.5; I 'misuse' them so Teletext 64 Ultimate can set the colour orange
+	TCC_ALPHA_ORANGE  = TCC_DOUBLE_WIDTH
+	TCC_MOSAIC_ORANGE = TCC_DOUBLE_SIZE
 )
 
 // moved these vars to a struct; I found out that using global vars is very tricky because a
@@ -438,6 +460,7 @@ If you do not have one, you can request one here: https://developer.yle.fi/en/in
 	mux.HandleFunc("/UD/", udHandler)
 	mux.HandleFunc("/ud/", udHandler)
 
+	// for remote loading teletext64-mlf.prg
 	downloadsFS := http.StripPrefix("/downloads/", http.FileServer(http.Dir("downloads")))
 	mux.Handle("/downloads/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		filename := strings.TrimPrefix(r.URL.Path, "/downloads/")
@@ -445,6 +468,49 @@ If you do not have one, you can request one here: https://developer.yle.fi/en/in
 			logDownloadOnce(getClientIP(r), filename)
 		}
 		downloadsFS.ServeHTTP(w, r)
+	}))
+
+	// for remote loading fonts - served from the binary's embedded copy (see
+	// embeddedFontsFS above), not a "fonts" folder on this server's disk
+	fontsSubFS, err := fs.Sub(embeddedFontsFS, "fonts")
+	if err != nil {
+		panic(err) // only possible if the embed directive itself is broken - a build-time bug, not a runtime one
+	}
+	fontsFS := http.StripPrefix("/fonts/", http.FileServer(http.FS(fontsSubFS)))
+	mux.Handle("/fonts/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		filename := strings.TrimPrefix(r.URL.Path, "/fonts/")
+		if filename != "" {
+			logDownloadOnce(getClientIP(r), filename)
+		}
+		fontsFS.ServeHTTP(w, r)
+	}))
+
+	// for remote loading drivers (currently only a mouse driver) - also embedded, see above
+	driversSubFS, err := fs.Sub(embeddedDriversFS, "drivers")
+	if err != nil {
+		panic(err)
+	}
+	driversFS := http.StripPrefix("/drivers/", http.FileServer(http.FS(driversSubFS)))
+	mux.Handle("/drivers/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		filename := strings.TrimPrefix(r.URL.Path, "/drivers/")
+		if filename != "" {
+			logDownloadOnce(getClientIP(r), filename)
+		}
+		driversFS.ServeHTTP(w, r)
+	}))
+
+	// for other self-hosted PetsciiProxy instances to fetch this station's hand-authored .tti
+	// source when they don't have a local copy - see teletext64GetTeletexPage's fallback in
+	// tti.go. Deliberately NOT embedded (unlike fonts/drivers above): this is content the
+	// maintainer wants to update by just replacing a file, not by rebuilding the binary. Served
+	// straight from local disk, same as fonts/drivers used to be.
+	teletext64TTIFS := http.StripPrefix("/teletext64-tti/", http.FileServer(http.Dir(DirTELETEXT64TTI)))
+	mux.Handle("/teletext64-tti/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		filename := strings.TrimPrefix(r.URL.Path, "/teletext64-tti/")
+		if filename != "" {
+			logDownloadOnce(getClientIP(r), filename)
+		}
+		teletext64TTIFS.ServeHTTP(w, r)
 	}))
 
 	go startCSVLogger()
@@ -552,8 +618,17 @@ func modTime(path string) time.Time {
 	return info.ModTime()
 }
 
+// Optional hooks a build-tag-gated station file (see rai.go, built with -tags rai) can rewire at
+// init() to opt itself out of the freshness cache / offline backoff below entirely. Left as no-ops
+// here so this file doesn't need to know that station exists in a default build.
+var bypassFreshnessCheck = func(path string) bool { return false }
+var bypassOfflineBackoff = func(dirStation string) bool { return false }
+
 // reports whether the cached file was written within the last freshTTL
 func isFresh(path string) bool {
+	if bypassFreshnessCheck(path) {
+		return false
+	}
 	t := modTime(path)
 	return !t.IsZero() && time.Since(t) < freshTTL
 }
@@ -562,6 +637,9 @@ func isFresh(path string) bool {
 // failed (or isn't currently marked offline) always returns true. Once marked offline, it's only
 // retried after stationRecheckInterval has passed since the last attempt.
 func shouldAttemptFetch(dirStation string) bool {
+	if bypassOfflineBackoff(dirStation) {
+		return true
+	}
 	healthMu.Lock()
 	defer healthMu.Unlock()
 	h, ok := health[dirStation]

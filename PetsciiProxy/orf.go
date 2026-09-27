@@ -48,17 +48,17 @@ func orfGetTeletexPage(pageNr string, station string, dirStation string) bool {
 	ps, ns, ct = getPrevNextSubpage(parts[0], nav)
 	pp, np = buildPageNavDirectives(nav.prevPage, nav.nextPage)
 
-	ftl1 := "100-0" // ORF 1, 2 and 3 - Übersicht
-	ftl2 := "111-0" // ORF 1, 2 and 3 - Schlagzeilen
-	ftl3 := "200-0" // ORF 1, 2 - Sport
-	ftl4 := "600-0" // ORF 1, 2 and 3 - Wetter
+	ftl1 := "100" // ORF 1, 2 and 3 - Übersicht
+	ftl2 := "111" // ORF 1, 2 and 3 - Schlagzeilen
+	ftl3 := "200" // ORF 1, 2 - Sport
+	ftl4 := "600" // ORF 1, 2 and 3 - Wetter
 	if strings.Contains(station, "iii") {
-		ftl2 = "300-0" // Fernsehen
-		ftl3 = "400-0" // Kultur
+		ftl2 = "300" // Fernsehen
+		ftl3 = "400" // Kultur
 	}
 	if strings.Contains(station, "sport") {
-		ftl2 = "200-0" // Sport
-		ftl3 = "300-0" // Fernsehen
+		ftl2 = "200" // Sport
+		ftl3 = "300" // Fernsehen
 	}
 	var output []byte
 	output = append(output, []byte(fmt.Sprintf(
@@ -301,7 +301,7 @@ func parseORFRows(body io.Reader, station string, pageNr string) ([][]byte, Navi
 	// Static Footer Fastext generation defaults overrides
 	switch station {
 	case "orf1", "orf2":
-		copy(pageBuffer[24][0:], "\x01\xDCbersicht \x02Schlagzeilen \x03Sport \x06Wetter")
+		copy(pageBuffer[24][0:], "\x01\xDCbersicht \x02Schlagzeilen \x03Sport  \x06Wetter")
 	case "orfiii":
 		copy(pageBuffer[24][0:], "\x01\xDCbersicht\x02Fernsehen\x03Kultur+Show \x06Wetter")
 	case "sportplus":

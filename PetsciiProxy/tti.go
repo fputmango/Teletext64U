@@ -46,7 +46,7 @@ func chunkytextGetTeletexPage(pageNr string) bool {
 
 	var output []byte
 	output = append(output, []byte(fmt.Sprintf(
-		"pn=p_\npn=n_\n%v%v%vftl=%v-0\nftl=%v-0\nftl=%v-0\nftl=%v-0\n<pre>",
+		"pn=p_\npn=n_\n%v%v%vftl=%v\nftl=%v\nftl=%v\nftl=%v\n<pre>",
 		ps, ns, ct,
 		string(ftl[0]), string(ftl[1]), string(ftl[2]), string(ftl[3])))...)
 
@@ -110,7 +110,7 @@ func ceefaxGetTeletexPage(pageNr string) bool {
 
 	var output []byte
 	output = append(output, []byte(fmt.Sprintf(
-		"pn=p_\npn=n_\n%v%v%vftl=%v-0\nftl=%v-0\nftl=%v-0\nftl=%v-0\n<pre>",
+		"pn=p_\npn=n_\n%v%v%vftl=%v\nftl=%v\nftl=%v\nftl=%v\n<pre>",
 		ps, ns, ct,
 		string(ftl[0]), string(ftl[1]), string(ftl[2]), string(ftl[3])))...)
 
@@ -157,7 +157,7 @@ func teefaxGetTeletexPage(pageNr string) bool {
 
 	var output []byte
 	output = append(output, []byte(fmt.Sprintf(
-		"pn=p_\npn=n_\n%v%v%vftl=%v-0\nftl=%v-0\nftl=%v-0\nftl=%v-0\n<pre>",
+		"pn=p_\npn=n_\n%v%v%vftl=%v\nftl=%v\nftl=%v\nftl=%v\n<pre>",
 		ps, ns, ct,
 		string(ftl[0]), string(ftl[1]), string(ftl[2]), string(ftl[3])))...)
 
@@ -192,7 +192,7 @@ func webfaxGetTeletexPage(pageNr string, station string, dirStation string) bool
 
 	var output []byte
 	output = append(output, []byte(fmt.Sprintf(
-		"pn=p_\npn=n_\n%v%v%vftl=%v-0\nftl=%v-0\nftl=%v-0\nftl=%v-0\n<pre>",
+		"pn=p_\npn=n_\n%v%v%vftl=%v\nftl=%v\nftl=%v\nftl=%v\n<pre>",
 		ps, ns, ct,
 		string(ftl[0]), string(ftl[1]), string(ftl[2]), string(ftl[3])))...)
 
@@ -227,7 +227,7 @@ func sparkGetTeletexPage(pageNr string) bool {
 
 	var output []byte
 	output = append(output, []byte(fmt.Sprintf(
-		"pn=p_\npn=n_\n%v%v%vftl=%v-0\nftl=%v-0\nftl=%v-0\nftl=%v-0\n<pre>",
+		"pn=p_\npn=n_\n%v%v%vftl=%v\nftl=%v\nftl=%v\nftl=%v\n<pre>",
 		ps, ns, ct,
 		string(ftl[0]), string(ftl[1]), string(ftl[2]), string(ftl[3])))...)
 
@@ -311,6 +311,81 @@ func bmn1GetTeletexPage(pageNr string) bool {
 
 	output = append(output, []byte("</pre>")...)
 	savePage(DirBMN1, pageNr, output)
+	return true
+}
+
+// --- Teletext 64 ---
+
+func teletext64GetTeletexPage(pageNr string) bool {
+	parts := strings.Split(pageNr, "-")
+
+	// .tti source files:
+	// We first try the local copy (DirTELETEXT64TTI). Falls back to fetching this exact same station's live copy from petsciiproxy.nl only when
+	// there's no local file - i.e. on someone else's self-hosted instance that hasn't placed their own P<page>.tti locally.
+	// Mirrors ceefaxGetTeletexPage()'s remote-.tti pattern, just with petsciiproxy.nl itself as the origin instead of a third party.
+	// Deliberately not cached to disk after a remote fetch.
+	var body io.Reader
+	filePath := filepath.Join(DirTELETEXT64TTI, "P"+parts[0]+".tti")
+	if f, err := os.Open(filePath); err == nil {
+		defer f.Close()
+		logFetchingPage(filePath)
+		body = f
+	} else {
+		url := fmt.Sprintf("http://petsciiproxy.nl/teletext64/P%s.tti", parts[0])
+		logFetchingPage(url)
+		resp, err := http.Get(url)
+		if err != nil {
+			return false
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != 200 {
+			fmt.Println("HTTP Error: Could not retrieve page", pageNr, "Status:", resp.StatusCode)
+			return true
+		}
+		body = resp.Body
+	}
+
+	rows, nav := parseTTIRows(body, parts[0], parts[1], false)
+	ps, ns, ct := getPrevNextSubpage(parts[0], nav)
+
+	var output []byte
+	output = append(output, []byte(fmt.Sprintf(
+		"pn=p_\npn=n_\n%v%v%vftl=100\nftl=199\nftl=200\nftl=300\n<pre>",
+		ps, ns, ct))...)
+
+	// Re-create header
+	copy(rows[0][1:], fmt.Sprintf("         \x02TXT64   %s", getBMNDate()))
+
+	// post-fix the 'double red' used on Teletext 64 Ultimate logo on page 100 and the Meatloaf logo on any other page (only 2 cases)
+	var firstRowIdx, secondRowIdx, redIdx int = -1, -1, -1
+	if parts[0] != "312" {
+		for i, r := range rows {
+			redIdx = bytes.IndexByte(r, TCC_MOSAIC_RED)
+			if redIdx != -1 {
+				if firstRowIdx != -1 {
+					secondRowIdx = i
+					break
+				} else {
+					firstRowIdx = i
+					continue
+				}
+			}
+		}
+		if firstRowIdx != -1 && secondRowIdx != -1 {
+			if parts[0] == "100" {
+				rows[secondRowIdx][redIdx] = TCC_MOSAIC_ORANGE
+			} else {
+				rows[firstRowIdx][redIdx] = TCC_MOSAIC_ORANGE
+			}
+		}
+	}
+
+	for _, r := range rows {
+		output = append(output, r...)
+	}
+
+	output = append(output, []byte("</pre>")...)
+	savePage(DirTELETEXT64, pageNr, output)
 	return true
 }
 
@@ -429,12 +504,22 @@ func parseTTIRows(r io.Reader, pageStr string, subpageStr string, isCEEFAX bool)
 					// Large number on the right is a unix time stamp
 					copy(rows[0][7:], fmt.Sprintf("\x07CEEFAX 1 %s ", pageStr))
 					unixtime := bytes.Split(rows[0], []byte{0x01})
-					timestampStr := string(unixtime[1])
-					unixInt64, err := strconv.ParseInt(timestampStr, 10, 64)
-					if err != nil {
-						fmt.Printf("timeStampStr:%v error strconv: %v\n", timestampStr, err)
+					var timeStr string
+					if len(unixtime) > 1 {
+						timestampStr := string(unixtime[1])
+						unixInt64, err := strconv.ParseInt(timestampStr, 10, 64)
+						if err != nil {
+							fmt.Printf("timeStampStr:%v error strconv: %v\n", timestampStr, err)
+							timeStr = formatTime(0, false)
+						} else {
+							timeStr = formatTime(unixInt64, true)
+						}
+					} else {
+						// No 0x01 (TCC_ALPHA_RED) byte found in the reconstructed header row, so there's
+						// no embedded unix timestamp to parse for this page. Fall back to current time
+						// rather than panicking on unixtime[1].
+						timeStr = formatTime(0, false)
 					}
-					timeStr := formatTime(unixInt64, true)
 					copy(rows[0][21:], timeStr)
 				}
 			}

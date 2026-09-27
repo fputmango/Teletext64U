@@ -44,7 +44,7 @@ Teletext 64 Ultimate has its own dedicated server at petsciiproxy.nl, so you don
 |Forum64 |Germany (RSS feed) |
 |BMN1 Bollentekst |The Netherlands |
 |HBN Teksti-TV |Finland |
-|MTVA Teletext |Hungary |
+|MTVA Teletext |Hungary (offline)|
  
 My mission: add as many Teletext services as possible. So let me know if you have any wishes.
 
@@ -68,6 +68,7 @@ Although the C64U has excellent networking capabilities, it unfortunately is res
 - Double height text, blinking text, hidden/concealed text that can be revealed.
 - Auto rotating subpages with a configurable cycle time.
 - **Quick navigation** – Using only the cursor keys, RETURN, and the ↑ key, all located together on the right side of the C64 keyboard, you can quickly move back and forth through pages without having to enter page numbers.
+- User's Guide as a Teletext service!
 
 ## Tools used for this project
 - Xcode, CC65, Visual Studio Code, CharPad 

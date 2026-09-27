@@ -1,5 +1,19 @@
 # **Teletext64U** changelog
 
+## [2.7.0] - 2026-09-27
+
+### Added
+- 1351 (compatible) mouse support on port 1. The mouse pointer will show itself if the user moves the mouse. The driver will be downloaded automatically at startup. Page numbers and fastext links can be selected by hoovering over them. Left click selects the page and right click steps back. Top left is a mouse menu button. When clicked, a tiny menu appears with some further navigation options. 
+- A brand new User's Guide as a Teletext service (press F8). It was born because I needed some free memory for the mouse support. So I ditched the help screen and replaced it with this. Right now there is the Key Bindings page on 101. A-Z index on 199, Installation section on 200, General Info pages on 300 and the available Teletext services on 400.
+
+### Changed
+- The built-in Teletext fonts have been removed from the PRG file to free up memory for the new features. They are embedded in the PetsciiProxy server and will be downloaded when Teletext64U starts.
+- T is now used to toggle between the bold and thin fonts. Previously, T was used to switch to the thin font, while B was used to switch to the bold font.
+
+### Fixed
+- If Cycle Time was set in a .TTI file, and there were no subpages, then C64U requested the next non existing subpage if the cycle time was due. The server served the page resulting in an infinity number of the same pages, with increased file number. E.g. page 307-0 was requested with a CT=30 in the header. This would result in the server producing 307-0, 307-2, 307-3, 307-4 and so on. With this fix, when cycle time is due, the program does not automatically increase the subpage number.
+
+
 ## [2.6.1] - 2026-08-26
 
 ### Added

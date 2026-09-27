@@ -24,8 +24,7 @@
 |F3 | Fastext green |
 |F5 | Fastext yellow |
 |F7 | Fastext cyan |
-|F8 | Help screen |
-|C= + S | Stopwatch ON/OFF toggle - measures total time needed for network request, decode & rendering page on screen. Expressed in jiffies (60 jiffies = 1 second) |
+|F8 | new: User's Guide as a Teletext service!|
 
 ## Config utility
 Note: This is a separate program, available only with the disk and D64 versions. The standalone WiC64 PRG version includes a built-in configuration screen.
