@@ -99,13 +99,7 @@ import (
 	"time"
 )
 
-// Fonts and the mouse driver are stable, rarely-changing binary assets baked
-// straight into the executable at build time - a self-hosted instance built
-// from this source tree always has them, with no separate deploy step and
-// no runtime dependency on petsciiproxy.nl. Contrast with the TELETEXT64
-// .tti source below, which stays on-disk deliberately (see
-// DirTELETEXT64TTI) because it's actively-authored content the maintainer
-// wants to update by just replacing a file, not by rebuilding the binary.
+// Fonts and mouse driver are baked straight into the executable at build time.
 //
 //go:embed fonts
 var embeddedFontsFS embed.FS
@@ -114,7 +108,7 @@ var embeddedFontsFS embed.FS
 var embeddedDriversFS embed.FS
 
 // Version
-const pp_version = "2.7.0"
+const pp_version = "2.7.1"
 
 // Supported teletext services
 const (
@@ -468,6 +462,16 @@ If you do not have one, you can request one here: https://developer.yle.fi/en/in
 			logDownloadOnce(getClientIP(r), filename)
 		}
 		downloadsFS.ServeHTTP(w, r)
+	}))
+
+	// for remote loading teletext64 Pnnn.tti files
+	teletext64FS := http.StripPrefix("/teletext64/", http.FileServer(http.Dir("teletext64")))
+	mux.Handle("/teletext64/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		filename := strings.TrimPrefix(r.URL.Path, "/teletext64/")
+		if filename != "" {
+			logDownloadOnce(getClientIP(r), filename)
+		}
+		teletext64FS.ServeHTTP(w, r)
 	}))
 
 	// for remote loading fonts - served from the binary's embedded copy (see
