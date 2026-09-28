@@ -68,10 +68,11 @@ Although the C64U has excellent networking capabilities, it unfortunately is res
 - Double height text, blinking text, hidden/concealed text that can be revealed.
 - Auto rotating subpages with a configurable cycle time.
 - **Quick navigation** – Using only the cursor keys, RETURN, and the ↑ key, all located together on the right side of the C64 keyboard, you can quickly move back and forth through pages without having to enter page numbers.
-- User's Guide as a Teletext service!
+- User's Guide as a Teletext service.
+- Mouse support - click page numbers and fastext links. And use the tiny mouse menu for more navigation options.
 
 ## Tools used for this project
-- Xcode, CC65, Visual Studio Code, CharPad 
+- Xcode, CC65, Visual Studio Code, CharPad, spritemate.com (for drawing the mouse pointer) 
 
 ## Source code
 PetsciiProxy source code is provided, including makefile. Teletext64U source code will be added later.
