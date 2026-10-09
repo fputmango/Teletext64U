@@ -354,7 +354,7 @@ func teletext64GetTeletexPage(pageNr string) bool {
 		ps, ns, ct))...)
 
 	// Re-create header
-	copy(rows[0][1:], fmt.Sprintf("         \x02TXT64   %s", getBMNDate()))
+	copy(rows[0][1:], fmt.Sprintf("         \x02TXT64  %s", getTTXDate()))
 
 	// post-fix the 'double red' used on Teletext 64 Ultimate logo on page 100 and the Meatloaf logo on any other page (only 2 cases)
 	var firstRowIdx, secondRowIdx, redIdx int = -1, -1, -1
@@ -619,6 +619,14 @@ func getTeefaxURL(pageID string) (string, error) {
 			}
 		}
 	}
+}
+
+func getTTXDate() string {
+	now := time.Now()
+	//days := map[string]string{"Sun": "Su", "Mon": "Mo", "Tue": "TU", "Wed": "We", "Thu": "Th", "Fri": "Fr", "Sat": "Sa"}
+	yearStr := strconv.Itoa(now.Year())
+	//	return fmt.Sprintf("\x07%s %02d.%02d.%s %s", days[now.Format("Mon")], now.Day(), now.Month(), yearStr[2:], now.Format("15:04:05"))
+	return fmt.Sprintf("\x07%s %02d.%02d.%s %s", now.Format("Mon"), now.Day(), now.Month(), yearStr[2:], now.Format("15:04:05"))
 }
 
 func getBMNDate() string {

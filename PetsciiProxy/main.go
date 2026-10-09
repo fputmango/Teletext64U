@@ -18,6 +18,7 @@ Supported teletext services:
 - ARD TEXT (Germany: 'Der Teletext im Ersten')
 - ZDF Text, ZDF Info, ZDF Neo (Germany)
 - WDR text (Germany)
+- NDR Text (Germany)
 - ORF 1, ORF 2, ORF III, ORF Sport+ (Austria)
 - 3SAT (Germany)
 - hr-text (Germany)
@@ -108,48 +109,50 @@ var embeddedFontsFS embed.FS
 var embeddedDriversFS embed.FS
 
 // Version
-const pp_version = "2.7.1"
+const pp_version = "2.8.0"
 
 // Supported teletext services
 const (
-	DirNOS           = "NOS-TT"
-	DirARD           = "ARD-TEXT"
-	DirZDF           = "ZDF-TEXT"
-	DirZDFinfo       = "ZDFINFO"
-	DirZDFneo        = "ZDFNEO"
-	Dir3sat          = "3SAT"
-	DirWDR           = "WDR-TEXT"
-	DirORF1          = "ORF1"
-	DirORF2          = "ORF2"
-	DirORF3          = "ORF3"
-	DirORFSport      = "ORFSPORT"
-	DirHR            = "HR-TEXT"
-	DirSWRBW         = "SWR-BW"
-	DirSWRRP         = "SWR-RP"
-	DirCEEFAX        = "CEEFAX"
-	DirTEEFAX        = "TEEFAX"
-	DirTEKSTI        = "TEKSTI-TV"
-	DirHBNTEKSTI     = "HBN-TEKSTI-TV"
-	DirSVT           = "SVT-TEXT"
-	DirDR            = "DR-TEKST-TV"
-	DirCHUNKYTEXT    = "CHUNKYTEXT"
-	DirWEBFAX1       = "WEBFAX1"
-	DirWEBFAX2       = "WEBFAX2"
-	DirSPARK         = "SPARK"
-	DirSRF1          = "SRF1"
-	DirSRF2          = "SRF2"
-	DirSRFInfo       = "SRFINFO"
-	DirRTS1          = "RTS1"
-	DirRTS2          = "RTS2"
-	DirRSILA1        = "RSILA1"
-	DirRSILA2        = "RSILA2"
-	DirNOSNEWS       = "NOSNEWS"    // RSS-generated NOS Nieuws pages (Dutch), see nosnews.go
-	DirFORUM64       = "FORUM64"    // RSS-generated forum64.de thread activity (German), see forum64.go
-	DirMTVATXT       = "MTVA-TXT"   // teletext.hu, MTVA's official teletext service (Hungarian), see mtvatxt.go
-	DirBMN1          = "BMN1"       // Bollentekst
-	DirUD            = "UD"         // User Directory where user preferences are stored for the stand alone WiC64 edition
-	DirTELETEXT64    = "TELETEXT64" // Teletext 64 Ultimate's own Users's Guide as a Teletext service
-	DirTELETEXT64TTI = "teletext64" // Host folder of the TTI files; deliberate lower case folder name - see teletext64GetTeletexPage in tti.go
+	DirNOS              = "NOS-TT"
+	DirARD              = "ARD-TEXT"
+	DirZDF              = "ZDF-TEXT"
+	DirZDFinfo          = "ZDFINFO"
+	DirZDFneo           = "ZDFNEO"
+	Dir3sat             = "3SAT"
+	DirWDR              = "WDR-TEXT"
+	DirORF1             = "ORF1"
+	DirORF2             = "ORF2"
+	DirORF3             = "ORF3"
+	DirORFSport         = "ORFSPORT"
+	DirHR               = "HR-TEXT"
+	DirNDR              = "NDR"
+	DirSWRBW            = "SWR-BW"
+	DirSWRRP            = "SWR-RP"
+	DirCEEFAX           = "CEEFAX"
+	DirTEEFAX           = "TEEFAX"
+	DirTEKSTI           = "TEKSTI-TV"
+	DirHBNTEKSTI        = "HBN-TEKSTI-TV"
+	DirSVT              = "SVT-TEXT"
+	DirDR               = "DR-TEKST-TV"
+	DirCHUNKYTEXT       = "CHUNKYTEXT"
+	DirWEBFAX1          = "WEBFAX1"
+	DirWEBFAX2          = "WEBFAX2"
+	DirSPARK            = "SPARK"
+	DirSRF1             = "SRF1"
+	DirSRF2             = "SRF2"
+	DirSRFInfo          = "SRFINFO"
+	DirRTS1             = "RTS1"
+	DirRTS2             = "RTS2"
+	DirRSILA1           = "RSILA1"
+	DirRSILA2           = "RSILA2"
+	DirNOSNEWS          = "NOSNEWS"    // RSS-generated NOS Nieuws pages (Dutch), see nosnews.go
+	DirFORUM64          = "FORUM64"    // RSS-generated forum64.de thread activity (German), see forum64.go
+	DirMTVATXT          = "MTVA-TXT"   // teletext.hu, MTVA's official teletext service (Hungarian), see mtvatxt.go | Currently NOT used by client
+	DirBMN1             = "BMN1"       // Bollentekst
+	DirUD               = "UD"         // User Directory where user preferences are stored for the stand alone WiC64 edition
+	DirTELETEXT64       = "TELETEXT64" // Teletext 64 Ultimate's own Users's Guide as a Teletext service
+	DirTELETEXT64TTI    = "teletext64" // Host folder of the TTI files; deliberate lower case folder name - see teletext64GetTeletexPage in tti.go
+	DirTELETEKSTARCHIEF = "TELETEKSTARCHIEF"
 )
 
 // Pseudo-"station" label used in the CSV log / download log line for hits on /downloads/. Not a
@@ -159,42 +162,44 @@ const StationDownloads = "DOWNLOADS"
 
 // Each service has its own handler
 var handlers = map[string]http.HandlerFunc{
-	DirNOS:        makeHandler(DirNOS, nosttGetTeletexPage),
-	DirARD:        makeHandler(DirARD, ardtextGetTeletexPage),
-	DirZDF:        makeHandler(DirZDF, func(p string) bool { return zdftextGetTeletexPage(p, "zdf", DirZDF) }),
-	DirZDFinfo:    makeHandler(DirZDFinfo, func(p string) bool { return zdftextGetTeletexPage(p, "zdfinfo", DirZDFinfo) }),
-	DirZDFneo:     makeHandler(DirZDFneo, func(p string) bool { return zdftextGetTeletexPage(p, "zdfneo", DirZDFneo) }),
-	Dir3sat:       makeHandler(Dir3sat, func(p string) bool { return zdftextGetTeletexPage(p, "3sat", Dir3sat) }),
-	DirWDR:        makeHandler(DirWDR, wdrtextGetTeletexPage),
-	DirHR:         makeHandler(DirHR, hrtextGetTeletexPage),
-	DirSWRBW:      makeHandler(DirSWRBW, func(p string) bool { return swrGetTeletexPage(p, "bw", DirSWRBW) }),
-	DirSWRRP:      makeHandler(DirSWRRP, func(p string) bool { return swrGetTeletexPage(p, "rp", DirSWRRP) }),
-	DirORF1:       makeHandler(DirORF1, func(p string) bool { return orfGetTeletexPage(p, "orf1", DirORF1) }),
-	DirORF2:       makeHandler(DirORF2, func(p string) bool { return orfGetTeletexPage(p, "orf2", DirORF2) }),
-	DirORF3:       makeHandler(DirORF3, func(p string) bool { return orfGetTeletexPage(p, "orfiii", DirORF3) }),
-	DirORFSport:   makeHandler(DirORFSport, func(p string) bool { return orfGetTeletexPage(p, "sportplus", DirORFSport) }),
-	DirCEEFAX:     makeHandler(DirCEEFAX, ceefaxGetTeletexPage),
-	DirTEEFAX:     makeHandler(DirTEEFAX, teefaxGetTeletexPage),
-	DirCHUNKYTEXT: makeHandler(DirCHUNKYTEXT, chunkytextGetTeletexPage),
-	DirWEBFAX1:    makeHandler(DirWEBFAX1, func(p string) bool { return webfaxGetTeletexPage(p, "Webfax", DirWEBFAX1) }),
-	DirWEBFAX2:    makeHandler(DirWEBFAX2, func(p string) bool { return webfaxGetTeletexPage(p, "Webfax2", DirWEBFAX2) }),
-	DirSPARK:      makeHandler(DirSPARK, sparkGetTeletexPage),
-	DirTEKSTI:     makeHandler(DirTEKSTI, tekstiGetTeletexPage),
-	DirHBNTEKSTI:  makeHandler(DirHBNTEKSTI, hbntekstiGetTeletexPage),
-	DirSVT:        makeHandler(DirSVT, svttextGetTeletexPage),
-	DirDR:         makeHandler(DirDR, drteksttvGetTeletexPage),
-	DirSRF1:       makeHandler(DirSRF1, func(p string) bool { return srgGetTeletexPage(p, "SRF1", DirSRF1) }),
-	DirSRF2:       makeHandler(DirSRF2, func(p string) bool { return srgGetTeletexPage(p, "SRFzwei", DirSRF2) }),
-	DirSRFInfo:    makeHandler(DirSRFInfo, func(p string) bool { return srgGetTeletexPage(p, "SRFInfo", DirSRFInfo) }),
-	DirRTS1:       makeHandler(DirRTS1, func(p string) bool { return srgGetTeletexPage(p, "RTSUn", DirRTS1) }),
-	DirRTS2:       makeHandler(DirRTS2, func(p string) bool { return srgGetTeletexPage(p, "RTSDeux", DirRTS2) }),
-	DirRSILA1:     makeHandler(DirRSILA1, func(p string) bool { return srgGetTeletexPage(p, "RSILA1", DirRSILA1) }),
-	DirRSILA2:     makeHandler(DirRSILA2, func(p string) bool { return srgGetTeletexPage(p, "RSILA2", DirRSILA2) }),
-	DirNOSNEWS:    makeHandler(DirNOSNEWS, nosnewsGetTeletexPage),
-	DirFORUM64:    makeHandler(DirFORUM64, forum64GetTeletexPage),
-	DirMTVATXT:    makeHandler(DirMTVATXT, mtvatxtGetTeletexPage),
-	DirBMN1:       makeHandler(DirBMN1, bmn1GetTeletexPage),
-	DirTELETEXT64: makeHandler(DirTELETEXT64, teletext64GetTeletexPage),
+	DirNOS:              makeHandler(DirNOS, nosttGetTeletexPage),
+	DirARD:              makeHandler(DirARD, ardtextGetTeletexPage),
+	DirZDF:              makeHandler(DirZDF, func(p string) bool { return zdftextGetTeletexPage(p, "zdf", DirZDF) }),
+	DirZDFinfo:          makeHandler(DirZDFinfo, func(p string) bool { return zdftextGetTeletexPage(p, "zdfinfo", DirZDFinfo) }),
+	DirZDFneo:           makeHandler(DirZDFneo, func(p string) bool { return zdftextGetTeletexPage(p, "zdfneo", DirZDFneo) }),
+	Dir3sat:             makeHandler(Dir3sat, func(p string) bool { return zdftextGetTeletexPage(p, "3sat", Dir3sat) }),
+	DirWDR:              makeHandler(DirWDR, wdrtextGetTeletexPage),
+	DirNDR:              makeHandler(DirNDR, ndrtextGetTeletexPage),
+	DirHR:               makeHandler(DirHR, hrtextGetTeletexPage),
+	DirSWRBW:            makeHandler(DirSWRBW, func(p string) bool { return swrGetTeletexPage(p, "bw", DirSWRBW) }),
+	DirSWRRP:            makeHandler(DirSWRRP, func(p string) bool { return swrGetTeletexPage(p, "rp", DirSWRRP) }),
+	DirORF1:             makeHandler(DirORF1, func(p string) bool { return orfGetTeletexPage(p, "orf1", DirORF1) }),
+	DirORF2:             makeHandler(DirORF2, func(p string) bool { return orfGetTeletexPage(p, "orf2", DirORF2) }),
+	DirORF3:             makeHandler(DirORF3, func(p string) bool { return orfGetTeletexPage(p, "orfiii", DirORF3) }),
+	DirORFSport:         makeHandler(DirORFSport, func(p string) bool { return orfGetTeletexPage(p, "sportplus", DirORFSport) }),
+	DirCEEFAX:           makeHandler(DirCEEFAX, ceefaxGetTeletexPage),
+	DirTEEFAX:           makeHandler(DirTEEFAX, teefaxGetTeletexPage),
+	DirCHUNKYTEXT:       makeHandler(DirCHUNKYTEXT, chunkytextGetTeletexPage),
+	DirWEBFAX1:          makeHandler(DirWEBFAX1, func(p string) bool { return webfaxGetTeletexPage(p, "Webfax", DirWEBFAX1) }),
+	DirWEBFAX2:          makeHandler(DirWEBFAX2, func(p string) bool { return webfaxGetTeletexPage(p, "Webfax2", DirWEBFAX2) }),
+	DirSPARK:            makeHandler(DirSPARK, sparkGetTeletexPage),
+	DirTEKSTI:           makeHandler(DirTEKSTI, tekstiGetTeletexPage),
+	DirHBNTEKSTI:        makeHandler(DirHBNTEKSTI, hbntekstiGetTeletexPage),
+	DirSVT:              makeHandler(DirSVT, svttextGetTeletexPage),
+	DirDR:               makeHandler(DirDR, drteksttvGetTeletexPage),
+	DirSRF1:             makeHandler(DirSRF1, func(p string) bool { return srgGetTeletexPage(p, "SRF1", DirSRF1) }),
+	DirSRF2:             makeHandler(DirSRF2, func(p string) bool { return srgGetTeletexPage(p, "SRFzwei", DirSRF2) }),
+	DirSRFInfo:          makeHandler(DirSRFInfo, func(p string) bool { return srgGetTeletexPage(p, "SRFInfo", DirSRFInfo) }),
+	DirRTS1:             makeHandler(DirRTS1, func(p string) bool { return srgGetTeletexPage(p, "RTSUn", DirRTS1) }),
+	DirRTS2:             makeHandler(DirRTS2, func(p string) bool { return srgGetTeletexPage(p, "RTSDeux", DirRTS2) }),
+	DirRSILA1:           makeHandler(DirRSILA1, func(p string) bool { return srgGetTeletexPage(p, "RSILA1", DirRSILA1) }),
+	DirRSILA2:           makeHandler(DirRSILA2, func(p string) bool { return srgGetTeletexPage(p, "RSILA2", DirRSILA2) }),
+	DirNOSNEWS:          makeHandler(DirNOSNEWS, nosnewsGetTeletexPage),
+	DirFORUM64:          makeHandler(DirFORUM64, forum64GetTeletexPage),
+	DirMTVATXT:          makeHandler(DirMTVATXT, mtvatxtGetTeletexPage),
+	DirBMN1:             makeHandler(DirBMN1, bmn1GetTeletexPage),
+	DirTELETEXT64:       makeHandler(DirTELETEXT64, teletext64GetTeletexPage),
+	DirTELETEKSTARCHIEF: makeHandler(DirTELETEKSTARCHIEF, teletekstarchiefGetTeletexPage),
 }
 
 // Teletext control codes (range 0x00..0x1F); Alpha is a regular character; a mosaic is a graphics character

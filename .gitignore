@@ -20,11 +20,13 @@
 !/PetsciiProxy/dr.go
 !/PetsciiProxy/forum64.go
 !/PetsciiProxy/mtvatxt.go
+!/PetsciiProxy/ndr.go
 !/PetsciiProxy/nosnews.go
 !/PetsciiProxy/nostt.go
 !/PetsciiProxy/orf.go
 !/PetsciiProxy/srg.go
 !/PetsciiProxy/svttext.go
+!/PetsciiProxy/teletekstarchief.go
 !/PetsciiProxy/tekstitv.go
 !/PetsciiProxy/tti.go
 !/PetsciiProxy/ttxweb.go
@@ -56,6 +58,7 @@
 /Teletext64U/target/*
 !/Teletext64U/target/*.d64
 !/Teletext64U/target/teletext64-mlf.prg
+!/Teletext64U/target/teletext64-uci.prg
 !/Teletext64U/target/teletext64-wic64.prg
 !/Teletext64U/target/RunMeFirst.cfg
 !/Teletext64U/target/teletext.vpl

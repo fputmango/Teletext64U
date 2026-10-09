@@ -97,8 +97,7 @@ type nosNewsArticle struct {
 	paragraphs []nosNewsParagraph
 }
 
-// nosNewsStore holds one category's currently-visible articles and the pool of page numbers they can be assigned. Same as
-// Chunkytext's pattern of a mutex-guarded shared state refreshed by a background ticker and read by the per-request handler.
+// holds one category's currently-visible articles and the pool of page numbers they can be assigned.
 type nosNewsStore struct {
 	mu        sync.RWMutex
 	articles  []*nosNewsArticle // newest first

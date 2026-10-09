@@ -13,10 +13,10 @@
 |. | Subpage down |
 |Cursor keys or WASD | Quick Navgiation |
 |RETURN or E | Select and go to pagenumber |
-|R | Refresh current teletext page |
+|R | Refresh Teletext page |
+|P | Print Teletext page |
 |Space | Stop/Continue auto rotating subpages |
-|B | Bold font |
-|T | Thin font |
+|T | Toggle between bold/thin font |
 |/ | Switch station (carousel) |
 |M | Switch station (menu list) - Navigatge: cursor left/right, up/down or type first letter for quick select; RETURN selects station |
 |C | Shows/hides concealed text |
@@ -25,6 +25,20 @@
 |F5 | Fastext yellow |
 |F7 | Fastext cyan |
 |F8 | new: User's Guide as a Teletext service!|
+
+## Mouse operation
+| Action | Description |
+| :--- | :--- |
+|Left click page number or fastext link |Go to highlighted page |
+|Left click at the utmost right side or bottom of the screen (without highlighting anything) |Subbpage down |
+|Right click | Step back through visited pages (same as ↑ or Q keys) |
+|Hover over top left mouse menu | Displays mouse menu |
+|**Mouse menu icons** |  |
+|M | Station select menu |
+|- | Go to current page -1 / previous page |
+|+ | Go to current page +1 / next page |
+|∧ | Subpage up |
+|v | Subpage down |
 
 ## Config utility
 Note: This is a separate program, available only with the disk and D64 versions. The standalone WiC64 PRG version includes a built-in configuration screen.

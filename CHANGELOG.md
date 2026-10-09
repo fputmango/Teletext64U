@@ -1,5 +1,23 @@
 # **Teletext64U** changelog
 
+## [2.8.0] - 2026-10-09
+
+### Added 
+- NDR TEXT - Norddeutschen Rundfunk, a German teletext service
+- Teletekstarchief.nl - A Dutch archive of NOS Teletekst pages from the past. It's called NOS Archief in Teletext64U in the station menu, because the full Teletekstarchief.nl text was too long for the menu item.
+- stand alone Ultimate edition - teletext64-uci.prg. It connects to petsciiproxy.nl and stores user preferences on the server, just like the Meatloaf and WiC64 editions.
+- Print function (P) - send the current page to the printer (device 4 on IEC us). Only a Commodore MPS printer is supported. The print feature is not yet available in the Meatloaf edition due to a bus conflict on device #4. 
+
+### Removed
+- MTVA Teletext (Hungary) - not deleted in code, but as a station in Teletext64U, because the site that served the Teletext pages in HTML format is not online anymore for unknown reasons.
+
+
+## [2.7.1] - 2026-09-28
+
+### Fixed PetsciiProxy
+- added serving of teletext64 .tti fallback (User's Guide)
+
+
 ## [2.7.0] - 2026-09-27
 
 ### Added
