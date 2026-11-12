@@ -1,3 +1,13 @@
+// --- ttxeb parser ---
+//
+// Multiple services are based on the ttxweb system:
+// hr-text, SWR Baden-Württemberg & Rheinland-Pfalz
+//
+// more info: https://github.com/fabianswebworld/ttxweb
+//
+// Copyright (C) 2026 Frank Putman
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package main
 
 import (
@@ -10,8 +20,6 @@ import (
 
 	"golang.org/x/net/html"
 )
-
-// --- hr-text ---
 
 func hrtextGetTeletexPage(pageNr string) bool {
 	var url string

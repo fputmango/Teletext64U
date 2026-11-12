@@ -1,11 +1,16 @@
-package main
-
-// Forum64: RSS-generated teletext pages
+// --- Forum64 ---
+//
+// German Teletext service made from the forum64.de RSS-feed
 //
 // Single merged category: forum64.de only exposes one public RSS feed - recent thread activity across the
 // whole forum, no per-board filtering :-(
 //
 // Templates in assets/forum64/index.bin and assets/forum64/story.bin (similar to NOSNEWS)
+//
+// Copyright (C) 2026 Frank Putman
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package main
 
 import (
 	_ "embed"

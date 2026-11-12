@@ -1,0 +1,19 @@
+## VICE Palette file
+# Commodore 64 RGB colours
+#
+00 00 00 #Black
+FF FF FF #White
+FF 00 00 #Red
+00 FF FF #Cyan
+FF 00 FF #Violet / Purple
+00 FF 00 #Green
+00 00 FF #Blue
+FF FF 00 #Yellow
+FF A5 00 #Orange
+66 44 00 #Brown
+FF 77 77 #Light red
+33 33 33 #Dark grey / Grey 1
+77 77 77 #Grey 2
+AA FF 66 #Light green
+00 88 FF #Light blue
+BB BB BB #Light grey / Grey 3

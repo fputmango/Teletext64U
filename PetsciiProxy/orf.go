@@ -1,3 +1,10 @@
+// --- ORF text---
+//
+// Austrian Teletext services
+//
+// Copyright (C) 2026 Frank Putman
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package main
 
 import (
@@ -9,8 +16,6 @@ import (
 
 	"golang.org/x/net/html"
 )
-
-// --- ORF text---
 
 func orfGetTeletexPage(pageNr string, station string, dirStation string) bool {
 	var url string

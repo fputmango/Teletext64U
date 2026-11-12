@@ -1,3 +1,10 @@
+// --- DR TEKST-TV ---
+//
+// Danish Teletext service
+//
+// Copyright (C) 2026 Frank Putman
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package main
 
 import (
@@ -15,8 +22,6 @@ import (
 
 	"golang.org/x/net/html"
 )
-
-// --- DR TEKST-TV ---
 
 func drteksttvGetTeletexPage(pageNr string) bool {
 	parts := strings.Split(pageNr, "-")

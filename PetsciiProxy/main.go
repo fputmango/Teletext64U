@@ -1,11 +1,12 @@
 /*
 Petscii Proxy server
-Developed by Frank Putman, 2026
+Copyright (C) 2026 Frank Putman
+SPDX-License-Identifier: GPL-3.0-or-later
 
-This program acts as a middle man between the Commodore 64 Ultimate / other Ultimate products with networking
-capabilities / Original C64 with a WiC64.
+This program acts as a middle man between the Commodore 64 (Ultimate, WiC64, Meatloaf) with networking capabilities
+and the various Teletext services.
 
-[Teletext services]  <--HTTPS--> [PetsciiProxy] <--HTTP--> [C64 Ultimate/WiC64]
+[Teletext services]  <--HTTPS--> [PetsciiProxy] <--HTTP--> [Commodore 64/other clients]
 
 Functionality:
 - HTTPS/HTTP middle man proxy
@@ -15,7 +16,7 @@ Functionality:
 Supported teletext services:
 
 == German-language ==
-- ARD TEXT (Germany: 'Der Teletext im Ersten')
+- ARD TEXT (Germany)
 - ZDF Text, ZDF Info, ZDF Neo (Germany)
 - WDR text (Germany)
 - NDR Text (Germany)
@@ -31,30 +32,29 @@ Supported teletext services:
 - NMS CEEFAX (UK, closed by the BBC in 2012 and recreated by Nathan Dane)
 - TEEFAX (UK, a community-based service with a huge collection of fine teletext art, historical pages and other great stuff)
 - Chunkytext (UK)
-- Webfax 1 & Webfax 2 (UK)
 - SPARK (UK, by TVARK)
+- Webfax 1 & 2 (UK)
 
-== Other languages ==
-- NOS Teletekst / NOS-TT (The Netherlands, Dutch)
-- NOS Nieuws (The Netherlands, Dutch, RSS feed)
-- BMN1 Bollentekst (The Netherlands, Dutch)
+== Nordic languages ==
+- DR Tekst-TV (Denmark, Danish)
 - SVT Text (Sweden, Swedish)
 - YLE Teksti-TV (Finland, Finnish)
 - HBN Teksti-TV (Finland, Finnish)
-- DR Tekst-TV (Denmark, Danish)
+
+== Other languages ==
+- BMN1 Bollentekst (The Netherlands, Dutch)
+- NOS Teletekst / NOS-TT (The Netherlands, Dutch)
+- NOS Nieuws (The Netherlands, Dutch, RSS feed)
+- NOS Archief / teletekstarchief.nl (The Netherlands, Dutch, an archive filled with historic pages from 1980 and later)
 - RTS Un, RTS Deux (Switzerland, French)
 - RSI LA 1, RSI LA 2 (Switzerland, Italian)
 - MTVA Text (Hungary, Hungarian)
-
-Next up potential candidates:
-- RTP teletexto (Portugal) - https://www.rtp.pt/wportal/fab-txt/texto/100/100_0001.htm
-- RÚV (The Icelandic National Broadcasting Service), Textavarpið (Textvarpið) https://textavarp.is/sida/100/1
-
+- Telegazeta TVP 1, 2, 3, Kultura, Historia, Sport, Polonia (Poland, Polish)
 
 The NOS-TT file format is being used for the other teletext services:
-Is set up fairly efficient: mostly around 1073 bytes; a little bit bigger if a page has subpages.
+Is set up fairly efficient: mostly around 1073 bytes; or bigger if a page has subpages or page links.
 The file format is a text block with (sub)page and fastext links followed by a <pre>..</pre> block
-which contains 1000 bytes of raw teletext data (control codes, text and mosiac/graphic characters).
+which contains 1000 bytes of raw teletext data (control codes, text and mosiac characters).
 
 It looks like this:
     pn=p_503-1
@@ -81,7 +81,7 @@ E.g. lnk=110,09,37 refers to page 110 on row 9 column 37 (counting from 0,0).
 Why transform to the NOS-TT format? Basically to keep things simple for the Teletext64U viewer program on the C64.
 - It only has to support one uniform way of communicating with this proxy program.
 - It only needs to have one routine to decode teletext data.
-- Adding a new teletext service within Teletext64U is just adding an item to a table.
+- Adding a new teletext service within Teletext64U is just adding an item to a few tables.
 */
 
 package main
@@ -100,7 +100,7 @@ import (
 	"time"
 )
 
-// Fonts and mouse driver are baked straight into the executable at build time.
+// Fonts and mouse driver are baked straight into the executable at build time!
 //
 //go:embed fonts
 var embeddedFontsFS embed.FS
@@ -109,7 +109,7 @@ var embeddedFontsFS embed.FS
 var embeddedDriversFS embed.FS
 
 // Version
-const pp_version = "2.8.0"
+const pp_version = "2.9.0"
 
 // Supported teletext services
 const (
@@ -147,17 +147,21 @@ const (
 	DirRSILA2           = "RSILA2"
 	DirNOSNEWS          = "NOSNEWS"    // RSS-generated NOS Nieuws pages (Dutch), see nosnews.go
 	DirFORUM64          = "FORUM64"    // RSS-generated forum64.de thread activity (German), see forum64.go
-	DirMTVATXT          = "MTVA-TXT"   // teletext.hu, MTVA's official teletext service (Hungarian), see mtvatxt.go | Currently NOT used by client
-	DirBMN1             = "BMN1"       // Bollentekst
+	DirMTVATXT          = "MTVA-TXT"   // Hungarian teletext
+	DirBMN1             = "BMN1"       // aka Bollentekst
 	DirUD               = "UD"         // User Directory where user preferences are stored for the stand alone WiC64 edition
 	DirTELETEXT64       = "TELETEXT64" // Teletext 64 Ultimate's own Users's Guide as a Teletext service
 	DirTELETEXT64TTI    = "teletext64" // Host folder of the TTI files; deliberate lower case folder name - see teletext64GetTeletexPage in tti.go
 	DirTELETEKSTARCHIEF = "TELETEKSTARCHIEF"
+	DirTLGZ_TVP1        = "TLGZ-TG1" // Polish teletext (Telegazeta)
+	DirTLGZ_TVP2        = "TLGZ-TG2"
+	DirTLGZ_TVP3        = "TLGZ-OTV"
+	DirTLGZ_Kultura     = "TLGZ-KUL"
+	DirTLGZ_Historia    = "TLGZ-HIS"
+	DirTLGZ_Sport       = "TLGZ-SPO"
+	DirTLGZ_Polonia     = "TLGZ-SAT"
 )
 
-// Pseudo-"station" label used in the CSV log / download log line for hits on /downloads/. Not a
-// real teletext service and has no folder-per-station handler like the map above - see the
-// /downloads/ registration in main() and logDownloadOnce below.
 const StationDownloads = "DOWNLOADS"
 
 // Each service has its own handler
@@ -200,6 +204,13 @@ var handlers = map[string]http.HandlerFunc{
 	DirBMN1:             makeHandler(DirBMN1, bmn1GetTeletexPage),
 	DirTELETEXT64:       makeHandler(DirTELETEXT64, teletext64GetTeletexPage),
 	DirTELETEKSTARCHIEF: makeHandler(DirTELETEKSTARCHIEF, teletekstarchiefGetTeletexPage),
+	DirTLGZ_TVP1:        makeHandler(DirTLGZ_TVP1, func(p string) bool { return tlgzGetTeletexPage(p, DirTLGZ_TVP1) }),
+	DirTLGZ_TVP2:        makeHandler(DirTLGZ_TVP2, func(p string) bool { return tlgzGetTeletexPage(p, DirTLGZ_TVP2) }),
+	DirTLGZ_TVP3:        makeHandler(DirTLGZ_TVP3, func(p string) bool { return tlgzGetTeletexPage(p, DirTLGZ_TVP3) }),
+	DirTLGZ_Kultura:     makeHandler(DirTLGZ_Kultura, func(p string) bool { return tlgzGetTeletexPage(p, DirTLGZ_Kultura) }),
+	DirTLGZ_Historia:    makeHandler(DirTLGZ_Historia, func(p string) bool { return tlgzGetTeletexPage(p, DirTLGZ_Historia) }),
+	DirTLGZ_Sport:       makeHandler(DirTLGZ_Sport, func(p string) bool { return tlgzGetTeletexPage(p, DirTLGZ_Sport) }),
+	DirTLGZ_Polonia:     makeHandler(DirTLGZ_Polonia, func(p string) bool { return tlgzGetTeletexPage(p, DirTLGZ_Polonia) }),
 }
 
 // Teletext control codes (range 0x00..0x1F); Alpha is a regular character; a mosaic is a graphics character
@@ -305,25 +316,15 @@ func startCSVLogger() {
 	}
 }
 
-// Debounces the /downloads/ log line. A single LOAD"HTTP://...",8 on the C64 side turns into many
-// small HTTP requests as Meatloaf/the KERNAL pull the .prg in chunks (visible as a burst of
-// identical-looking "Client IP" lines from ipLoggingMiddleware within the same second) - this
-// collapses a whole burst from one client for one file into a single log line instead of one per
-// chunk. Keyed by client IP + filename so concurrent downloads of different files (or by different
-// clients) still each get their own line.
 var (
 	downloadLogMu   sync.Mutex
 	downloadLogSeen = map[string]time.Time{}
 )
 
-// How long a gap between chunk requests from the same client+file is still considered "the same
-// download". Each new chunk slides the window forward, so a download that takes longer than this
-// only logs once as long as no single gap between its chunks exceeds it.
+// Time gap between chunk requests from the same client+file still considered the same download. Each new chunk slides
+// the window forward, so a download that takes longer than this only logs once as long as no single gap between its chunks exceeds it.
 const downloadLogCooldown = 30 * time.Second
 
-// logDownloadOnce logs one line (stdout, for journalctl/live tailing) and one CSV entry (via the
-// existing logChan/pp-history.csv mechanism, so downloads show up alongside page requests) the
-// first time a given client+file pair is seen, then stays quiet for downloadLogCooldown.
 func logDownloadOnce(clientIP, filename string) {
 	key := clientIP + "|" + filename
 	now := time.Now()
@@ -352,8 +353,6 @@ func logDownloadOnce(clientIP, filename string) {
 	}
 }
 
-// cleanupDownloadLog periodically forgets old entries from downloadLogSeen so it doesn't grow
-// forever from one-off bot/scanner requests over the server's lifetime.
 func cleanupDownloadLog() {
 	ticker := time.NewTicker(time.Hour)
 	defer ticker.Stop()
@@ -369,7 +368,7 @@ func cleanupDownloadLog() {
 	}
 }
 
-// getClientIP extracts the real IP address from the request
+// extracts the real IP from the request
 func getClientIP(r *http.Request) string {
 	// Check for X-Forwarded-For proxy header first
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
@@ -390,9 +389,6 @@ func getClientIP(r *http.Request) string {
 	return ip
 }
 
-// logs the client IP for every incoming request, except /downloads/ - that route already gets its
-// own deduplicated "Download: ..." line via logDownloadOnce (see main()), and a .prg fetch turns
-// into many small chunk/range requests that would otherwise spam one raw "Client IP" line each.
 func ipLoggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/downloads/") {
@@ -508,11 +504,8 @@ If you do not have one, you can request one here: https://developer.yle.fi/en/in
 		driversFS.ServeHTTP(w, r)
 	}))
 
-	// for other self-hosted PetsciiProxy instances to fetch this station's hand-authored .tti
-	// source when they don't have a local copy - see teletext64GetTeletexPage's fallback in
-	// tti.go. Deliberately NOT embedded (unlike fonts/drivers above): this is content the
-	// maintainer wants to update by just replacing a file, not by rebuilding the binary. Served
-	// straight from local disk, same as fonts/drivers used to be.
+	// for other self-hosted PetsciiProxy instances to fetch this station's hand-authored .tti source when they don't have a local
+	// copy - see teletext64GetTeletexPage's fallback in tti.go. Served straight from local disk.
 	teletext64TTIFS := http.StripPrefix("/teletext64-tti/", http.FileServer(http.Dir(DirTELETEXT64TTI)))
 	mux.Handle("/teletext64-tti/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		filename := strings.TrimPrefix(r.URL.Path, "/teletext64-tti/")
@@ -533,9 +526,6 @@ If you do not have one, you can request one here: https://developer.yle.fi/en/in
 			syncChunkytextRepo()
 		}
 	}()
-
-	// NOSNEWS has no background ticker - it polls its feed lazily, only when a page is actually
-	// requested and the data has gone stale (see nosNewsCategory.pollIfStale in nosnews.go).
 
 	fmt.Printf("Teletext PetsciiProxy server v%v, serving on port %d\n", pp_version, port)
 
@@ -589,8 +579,7 @@ func writeResponse(w http.ResponseWriter, dirStation string, pageName string) {
 	}
 }
 
-// Fetches (and caches to disk) one teletext page for a station, and reports whether the station's
-// backend was reachable.
+// Fetches (and caches to disk) one teletext page for a station, and reports whether the station's backend was reachable.
 type fetchFunc func(pageNr string) bool
 
 // If a page is older than 1 minute it will be fetched from internet, otherwise from disk cache
@@ -599,9 +588,8 @@ const freshTTL = 60 * time.Second
 // Stations reported offline will be checked every 5 minutes to see if they are online again
 const stationRecheckInterval = 5 * time.Minute
 
-// This lists stations whose fetch function reads from local storage (a git mirror, a saved
-// archive, ...) instead of making a live network call. Currently only Chunkeytext.
-// note: syncChunkytextRepo checks if there is a newer repo.
+// This lists stations whose fetch function reads from local storage (a git mirror, a saved archive, ...) instead of making
+// a live network call. Currently only Chunkeytext. note: syncChunkytextRepo checks if there is a newer repo.
 var localOnlyStations = map[string]bool{
 	DirCHUNKYTEXT: true,
 	DirNOSNEWS:    true,
@@ -618,18 +606,14 @@ var (
 	health   = map[string]*stationHealth{}
 )
 
-// returns file age
 func modTime(path string) time.Time {
 	info, err := os.Stat(path)
 	if err != nil {
 		return time.Time{}
 	}
-	return info.ModTime()
+	return info.ModTime() // aka file age
 }
 
-// Optional hooks a build-tag-gated station file (see rai.go, built with -tags rai) can rewire at
-// init() to opt itself out of the freshness cache / offline backoff below entirely. Left as no-ops
-// here so this file doesn't need to know that station exists in a default build.
 var bypassFreshnessCheck = func(path string) bool { return false }
 var bypassOfflineBackoff = func(dirStation string) bool { return false }
 
@@ -642,9 +626,8 @@ func isFresh(path string) bool {
 	return !t.IsZero() && time.Since(t) < freshTTL
 }
 
-// reports whether it's OK to try a live fetch for this station right now. A station that has never
-// failed (or isn't currently marked offline) always returns true. Once marked offline, it's only
-// retried after stationRecheckInterval has passed since the last attempt.
+// reports if it's OK to try a live fetch for the station right now. A station that has never failed (or isn't currently marked
+// offline) always returns true. Once marked offline, it's only retried after stationRecheckInterval has passed since the last attempt.
 func shouldAttemptFetch(dirStation string) bool {
 	if bypassOfflineBackoff(dirStation) {
 		return true
@@ -671,20 +654,14 @@ func recordFetchResult(dirStation string, reachable bool) {
 	h.lastCheck = time.Now()
 }
 
-// builds the HTTP handler for one station: parse the requested page name, then either serve a
-// still-fresh cached copy, skip the fetch because the station is in its offline cooldown, or run
-// the station's fetch function and record whether it actually reached the backend.
+// builds HTTP handler for one station: parse the requested page name, then either serve a still-fresh cached copy, skip the fetch
+// because the station is in its offline cooldown, or run the station's fetch function and record whether it actually reached the backend.
 func makeHandler(dirStation string, fetch fetchFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		pageName := getPageName(r, dirStation)
 		path := filepath.Join(dirStation, pageName)
 		if localOnlyStations[dirStation] {
 			fetch(pageName)
-			// Always complete this request's log line here, unconditionally - fetch() may or may
-			// not have triggered a lazy poll internally (see pollIfStale in nosnews.go/forum64.go),
-			// and that poll logs itself separately via logBackgroundPoll when it happens. Waiting on
-			// it to complete this line left it dangling on every request that didn't happen to
-			// trigger one - see logFetchingPage/logBackgroundPoll in common.go for the full story.
 			logFetchingPage(path)
 			writeResponse(w, dirStation, pageName)
 			return

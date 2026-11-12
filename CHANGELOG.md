@@ -1,5 +1,31 @@
 # **Teletext64U** changelog
 
+## [2.9.0] - 2026-11-12
+
+### Added 
+- New stations: Telegazeta TVP 1, 2, 3, Kultura, Historia, Sport and Polonia (Poland).
+- ? key (or Shift-Slash) selects previous station.
+- £ key: enter and go to a 2 digit subpage number.
+- LICENSE (GPL-3.0-or-later), THIRD-PARTY-NOTICES, and Teletext64U source.
+
+### Removed 
+- Printing in colour (Shift-P). I had to remove this feature because I needed the memory to support the Polish national characters for the new Telegazeta services. Note: it can be activated again with a compiler directive for future use.
+
+### Changed
+- Station select menu has two layers now, due to the growing number of stations. Stations that have multiple variants, like ORF for example, are grouped in a submenu now. So the main item is ORF, and the submenu items are: ORF 1, ORF 2, ORF III an ORF Sport+. Stations that are grouped have a '>' at the end to indicate the submenu.
+- The RUN/STOP key / right mouse button cancels the station select menu, or steps back from the submenu to the main station select menu. Note: In previous versions you always had to pick a station.
+- Station menu: added a new 'Nordic' language section for DR Tekst-TV (Denmark), SVT Text (Sweden),Yle Teksti-TV and HBN Teksti-TV (both Finland). And changed station ordering.
+- F4 key toggles Stopwatch ON/OFF (formerly Commodore+S key combo).
+
+### Fixed
+- MTVA Text (Hungary) is available again by processing the GIF image and turn it into Teletext data.
+- nostt.go code improved; it caused an issue on page 718. And I made a custom double height/normal height case for page 751 'treininformatie actueel'.
+- Teletext64U WIC stand alone edition: always showed mouse pointer after startup. Now the pointer has to be moved first before it gets shown, like the other editions.
+- ARD-TEXT: 'ARD-TEXT' position shifted 1 column right to make room for the 'busy dots'.
+- Entering half of a new pagenumber and deciding to go to another page, for example with the + key, did not clear the entry state.
+- A plus between pagenumbers is a valid prefix or suffix now when looking for pagelinks, e.g. 840+842+844+845 will lead to 4 page links.
+
+
 ## [2.8.0] - 2026-10-09
 
 ### Added 

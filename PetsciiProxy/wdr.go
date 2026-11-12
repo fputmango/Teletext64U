@@ -1,3 +1,10 @@
+// --- WDR Text ---
+//
+// German Teletext service
+//
+// Copyright (C) 2026 Frank Putman
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package main
 
 import (
@@ -12,19 +19,12 @@ import (
 	"golang.org/x/net/html"
 )
 
-// --- WDR Text ---
-// Every WDR mobiltext cell is its own <div class="bg_X Y vt_col colN">, where
-// X is the background color name, Y is either a plain foreground color name
-// (e.g. "white") or a mosaic descriptor "g<color>_<hex>h" (e.g. "gblue_7Fh" -
-// same hex-mosaic-shape convention as ARD-TEXT's g1x##.gif images, just
-// spelled as a CSS class instead of an image filename), and colN is how many
-// character cells that run occupies.
+// Every WDR mobiltext cell is its own <div class="bg_X Y vt_col colN">, where X is the background color name,
+// Y is either a plain foreground color name (e.g. "white") or a mosaic descriptor "g<color>_<hex>h" (e.g. "gblue_7Fh"),
+// and colN is how many character cells that run occupies.
+
 var wdrMosaicRe = regexp.MustCompile(`^g([a-z]+)_([0-9A-Fa-f]{2})h$`)
 
-// Matches a run of whitespace that contains at least one tab/CR/LF (plain
-// space-only runs, e.g. deliberate multi-space padding, are left alone) -
-// used to collapse pretty-printing indentation embedded inside a single
-// text node down to the single space a real browser would render it as.
 var wdrInterTagWhitespaceRe = regexp.MustCompile(`[ \t]*[\t\r\n][ \t\r\n]*`)
 
 var wdrAlphaColorCode = map[string]byte{
@@ -48,8 +48,6 @@ var wdrMosaicColorCode = map[string]byte{
 	"cyan":    TCC_MOSAIC_CYAN,
 	"white":   TCC_MOSAIC_WHITE,
 }
-
-// --- WDR Text ---
 
 func wdrtextGetTeletexPage(pageNr string) bool {
 	var url string

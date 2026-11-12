@@ -1,3 +1,12 @@
+// --- TTI file parser ---
+//
+// A lot of services use the TTI format to store Teletext pages:
+// CEEFAX, TEEFAX, ChunkyText, Webfax 1 & 2, Spark, HBN Tekksti-TV, BMN1 Bollentekst and
+// Teletext 64's own Users Guide as a Teletext service.
+//
+// Copyright (C) 2026 Frank Putman
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package main
 
 import (
@@ -16,7 +25,7 @@ import (
 	"golang.org/x/net/html"
 )
 
-// Chunkeytext
+// Chunketext
 const chunkytextRepoURL = "https://zxnet.co.uk/git/cf.git"
 
 const chunkytextSyncInterval = 15 * time.Minute

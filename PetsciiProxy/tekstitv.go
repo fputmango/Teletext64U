@@ -1,3 +1,13 @@
+// --- YLE TEKSTI-TV  ---
+//
+// Finnish Teletext service
+//
+// You need to request an API key @ Yle broadcaster (free) to be able to use this service
+// If you dont have one, the service will show a Teletext info page with instructions how to obtain the API key
+//
+// Copyright (C) 2026 Frank Putman
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package main
 
 import (
@@ -58,8 +68,6 @@ type Subpage struct {
 type TeletextPage struct {
 	Subpages []Subpage `xml:"subpage"`
 }
-
-// --- YLE TEKSTI-TV  ---
 
 func tekstiGetTeletexPage(pageNr string) bool {
 	parts := strings.Split(pageNr, "-")

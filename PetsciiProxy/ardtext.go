@@ -1,3 +1,10 @@
+// --- ARD Text ---
+//
+// German Teletext service
+//
+// Copyright (C) 2026 Frank Putman
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package main
 
 import (
@@ -11,7 +18,6 @@ import (
 	"time"
 )
 
-// ARD Text
 // These characters are used in ARD-TEXT html classes, e.g. class='fgy bgb' means yellow character on a black background
 var ardColorMap = map[string]byte{
 	"b ": 0, // black, note: I have added black twice with an explicit space and single quote to prevent
@@ -47,7 +53,7 @@ var entityMap = map[string]byte{
 	"iuml":   0xEF, // ï
 }
 
-// Used to determine mosaic/graphic character in ARD-TEXT (seems also being used at text.orf.at)
+// Used to determine mosaic/graphic character in ARD-TEXT
 var mosaicRe = regexp.MustCompile(`g1[a-z]([0-9a-fA-F]{2})\.gif`)
 
 // --- ARD-TEXT ---
@@ -105,7 +111,7 @@ func ardtextGetTeletexPage(pageNr string) bool {
 	// Note: the ftl - fastext links are fixed for now; it could be made dynamic in a future release
 	// Startseite (100), Sport (200), Wetter (171) and Börse (711)
 	// aka: start page, sport, weather, stocks
-	// Note: to support prev/next subpage numbers; the full site must be parsed: e.g. https://www.ard-text.de/index.php?page=620
+	// Note: to support prev/next subpage numbers; the full site must be parsed: e.g. https://www.ard-text.de/index.php?page=403
 	// and detect something like this: <div id="output_unterseite" class="subpageCounter">1/3</div>
 	var output []byte
 	output = append(output, []byte(fmt.Sprintf(
@@ -117,13 +123,11 @@ func ardtextGetTeletexPage(pageNr string) bool {
 		row0[i] = 0x20
 	}
 	dt := getArdDate()
-	start := 5
-	row0[start] = byte(TCC_ALPHA_GREEN)
-	stationPage := "ARD-TEXT  " + parts[0]
-	copy(row0[start+1:], []byte(stationPage))
-	row0[start+14] = byte(TCC_ALPHA_YELLOW)
-	copy(row0[start+15:], stringToLatin1Bytes(dt))
-
+	start := 6
+	stationPage := "\x02ARD-TEXT " + parts[0]
+	copy(row0[start:], []byte(stationPage))
+	row0[start+13] = byte(TCC_ALPHA_YELLOW)
+	copy(row0[start+14:], stringToLatin1Bytes(dt))
 	output = append(output, row0...)
 
 	rows := parseARDRows(resp.Body, parts[0] != "100")
@@ -216,7 +220,6 @@ func parseARDRows(r io.Reader, correctFirstRows bool) [][]byte {
 
 	parseEntity := func() {
 		start := i
-		//for i < len(data) && data[i] != ';' && data[i] != '<' && data[i] != '>' && (i-start) < 8 {
 		for i < len(data) && data[i] != ';' && data[i] != '<' && data[i] != '>' && data[i] != '&' && (i-start) < 8 {
 			i++
 		}

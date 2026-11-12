@@ -1,19 +1,49 @@
+// --- MTVA Text---
+//
+// Hungarian Teletext service
+//
+// I started out with parsing this URL: www.teletext.hu/mtv1/mtext/ppp-ss.htm, but it stopped working after 31-08-2026.
+// Original source is commented out.
+//
+// Switched to GIF image to Teletext data conversion.
+// The main teletext service is on https://teletext.hu/mtv1/ppp-ss.HTM, which is based on GIF images. This is a first attempt to convert an
+// image into teletext data by detecting characters and mosaics. Image esolution is 520x400. So each character is 520/40=13 by and 400/25=16 pixels.
+//
+// Copyright (C) 2026 Frank Putman
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package main
 
 import (
 	"bytes"
 	"fmt"
+	"image/gif"
 	"io"
 	"net/http"
+	"regexp"
+	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
-
-	"golang.org/x/net/html"
 )
 
-// --- MTVA TXT (teletext.hu) ---
+const mtvaTxtRows = 25
 
+// Windows-1250/ISO-8859-2 mapping for each accented Hungarian letter; it's used by mtvatxt_glyphs.go
+var mtvaTxtAccentStrip = map[byte]byte{
+	0xE1: 0xE1, 0xC1: 0xC1, // á Á
+	0xE9: 0x60, 0xC9: 0x40, // é É
+	0xED: 0xED, 0xCD: 0xCD, // í Í
+	0xF3: 0xF3, 0xD3: 0xD3, // ó Ó
+	0xF6: 0x7C, 0xD6: 0x5C, // ö Ö
+	0xF5: 0x7C, 0xD5: 0x5C, // ő Ő
+	0xFA: 0xFA, 0xDA: 0xDA, // ú Ú
+	0xFC: 0x7E, 0xDC: 0x5E, // ü Ü
+	0xFB: 0x7E, 0xDB: 0x5E, // ű Ű
+}
+
+/*
 var mtvaTxtColorMap = map[string]byte{
 	"black":   TCC_ALPHA_BLACK,
 	"red":     TCC_ALPHA_RED,
@@ -27,22 +57,6 @@ var mtvaTxtColorMap = map[string]byte{
 	"aqua":    TCC_ALPHA_CYAN,
 	"white":   TCC_ALPHA_WHITE,
 }
-
-// mtvaTxtAccentStrip maps the Windows-1250/ISO-8859-2 byte for each accented Hungarian letter to
-// what gets sent in its place.
-var mtvaTxtAccentStrip = map[byte]byte{
-	0xE1: 0xE1, 0xC1: 0xC1, // á Á
-	0xE9: 0x60, 0xC9: 0x40, // é É
-	0xED: 0xED, 0xCD: 0xCD, // í Í
-	0xF3: 0xF3, 0xD3: 0xD3, // ó Ó
-	0xF6: 0x7C, 0xD6: 0x5C, // ö Ö
-	0xF5: 0x7C, 0xD5: 0x5C, // ő Ő
-	0xFA: 0xFA, 0xDA: 0xDA, // ú Ú
-	0xFC: 0x7E, 0xDC: 0x5E, // ü Ü
-	0xFB: 0x7E, 0xDB: 0x5E, // ű Ű
-}
-
-const mtvaTxtRows = 25
 
 const mtvaTxtMosaicFullBlock = 0x7F
 
@@ -65,41 +79,8 @@ func mtvaTxtSegmentContent(buf []byte) []mtvaTxtSegment {
 		return nil
 	}
 	return []mtvaTxtSegment{{mosaic: false, data: buf}}
-
-	/*
-		var segs []mtvaTxtSegment
-		i := 0
-		for i < len(buf) {
-			if buf[i] == '*' {
-				j := i
-				for j < len(buf) && buf[j] == '*' {
-					j++
-				}
-				if j-i >= 2 {
-					segs = append(segs, mtvaTxtSegment{mosaic: true, data: buf[i:j]})
-					i = j
-					continue
-				}
-			}
-			j := i
-			for j < len(buf) {
-				if buf[j] == '*' {
-					k := j
-					for k < len(buf) && buf[k] == '*' {
-						k++
-					}
-					if k-j >= 2 {
-						break
-					}
-				}
-				j++
-			}
-			segs = append(segs, mtvaTxtSegment{mosaic: false, data: buf[i:j]})
-			i = j
-		}
-		return segs
-	*/
 }
+*/
 
 func mtvatxtGetTeletexPage(pageNr string) bool {
 	parts := strings.SplitN(pageNr, "-", 2)
@@ -110,13 +91,31 @@ func mtvatxtGetTeletexPage(pageNr string) bool {
 			sub = v
 		}
 	}
-	url := mtvaTxtPageURL(page, sub)
-	logFetchingPage(url)
-	body, reachable := fetchMtvaTxtPage(url)
-	if body == nil {
-		return reachable
-	}
 
+	/*
+		if !mtvaTxtHTMLBlocked() {
+			url := fmt.Sprintf("https://www.teletext.hu/mtv1/mtext/%s-%02d.htm", page, sub)
+			logFetchingPage(url)
+			body, status, reachable := fetchMtvaTxtPage(url)
+			if body != nil {
+				return mtvaTxtBuildHTMLPage(body, page, sub, pageNr)
+			}
+			if !reachable {
+				return false
+			}
+			if status != http.StatusForbidden {
+				return true
+			}
+			// The HTML text pages are refused (since 13 Aug 2026): use the GIF pages for a while
+			mtvaTxtBlockHTML()
+		}
+	*/
+
+	return mtvaTxtGetGIFPage(page, sub, pageNr)
+}
+
+/*
+func mtvaTxtBuildHTMLPage(body []byte, page string, sub int, pageNr string) bool {
 	pageBuffer := parseMtvaTxtRows(body, page)
 	pageBuffer[0] = mtvaTxtHeaderRow(page)
 	// overwrite fastext row, fixed for now
@@ -137,38 +136,57 @@ func mtvatxtGetTeletexPage(pageNr string) bool {
 	savePage(DirMTVATXT, pageNr, output)
 	return true
 }
+*/
 
-func mtvaTxtPageURL(page string, sub int) string {
-	return fmt.Sprintf("https://www.teletext.hu/mtv1/mtext/%s-%02d.htm", page, sub)
-}
-
-func fetchMtvaTxtPage(url string) ([]byte, bool) {
+func fetchMtvaTxtPage(url string) ([]byte, int, bool) {
 	client := http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Get(url)
 	if err != nil {
 		fmt.Println("MTVA-TXT: connection error:", err)
-		return nil, false
+		return nil, 0, false
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
 		fmt.Println("MTVA-TXT: HTTP error, status", resp.StatusCode, "for", url)
-		return nil, true
+		return nil, resp.StatusCode, true
 	}
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		fmt.Println("MTVA-TXT: read error:", err)
-		return nil, false
+		return nil, resp.StatusCode, false
 	}
-	return body, true
+	return body, resp.StatusCode, true
 }
 
+const mtvaTxtHTMLRetryAfter = time.Hour
+
+var (
+	mtvaTxtHTMLMu        sync.Mutex
+	mtvaTxtHTMLBlockedAt time.Time
+)
+
+func mtvaTxtHTMLBlocked() bool {
+	mtvaTxtHTMLMu.Lock()
+	defer mtvaTxtHTMLMu.Unlock()
+	return !mtvaTxtHTMLBlockedAt.IsZero() && time.Since(mtvaTxtHTMLBlockedAt) < mtvaTxtHTMLRetryAfter
+}
+
+func mtvaTxtBlockHTML() {
+	mtvaTxtHTMLMu.Lock()
+	defer mtvaTxtHTMLMu.Unlock()
+	if mtvaTxtHTMLBlockedAt.IsZero() || time.Since(mtvaTxtHTMLBlockedAt) >= mtvaTxtHTMLRetryAfter {
+		fmt.Println("MTVA-TXT: HTML page refused, switching to GIF conversion for the next", mtvaTxtHTMLRetryAfter)
+	}
+	mtvaTxtHTMLBlockedAt = time.Now()
+}
+
+/*
 func parseMtvaTxtRows(body []byte, page string) [][]byte {
 	pageBuffer := newPageBuffer(mtvaTxtRows)
 
 	z := html.NewTokenizer(bytes.NewReader(body))
 	inPre := false
-	// start at -1 to force a drop of the provided header row; i make my own
-	row := -1
+	row := -1 // -1 to ignore of the header row because i make my own
 	col := 0
 	holdMosaicsSet := false
 	lastMosaicEndCol := -1
@@ -187,42 +205,6 @@ func parseMtvaTxtRows(body []byte, page string) [][]byte {
 	var pendingWSColor byte
 	var pendingWSWidth int
 
-	// commitPendingWS writes out a pending run of pure-whitespace spans.
-	//
-	// forContent is true when this run is immediately followed by real
-	// (non-whitespace) content, or by another differently-colored blank run,
-	// later in the same row - i.e. there's a reason to believe the run was
-	// deliberately setting up a background. When it's false (end of row, end
-	// of <pre>, or the row simply has nothing but blanks after this point),
-	// there's nothing to justify an explicit background change, so white
-	// always falls back to the safe literal form below, regardless of width.
-	//
-	// preserveWidth only matters when forContent is true (the non-forContent
-	// path below always writes the run's full width, regardless of this
-	// flag). It distinguishes two different situations flushSpan commits
-	// through this function:
-	//
-	//   - The LAST pending run right before real content: preserveWidth is
-	//     false, so it's always just the [color, NEW_BACKGROUND] pair (2
-	//     bytes), regardless of the run's original source width. This is a
-	//     deliberate, empirically-verified simplification (see the git log
-	//     for the "3-space lead-in" bug this fixed) - it keeps a page's
-	//     ordinary left margin at a fixed width across rows, rather than
-	//     varying between rows depending on how much room the rest of each
-	//     row's content happened to need.
-	//   - An EARLIER pending run that a later color change is about to
-	//     supersede (see flushSpan below): preserveWidth is true, so its
-	//     full source width is kept via literal padding after the pair.
-	//     These runs are typically deliberate column separators inside a
-	//     multi-column layout (e.g. a wide gap between a left and right
-	//     menu column) where the exact width is what creates the layout -
-	//     collapsing them to a fixed 2 bytes destroys that alignment.
-	//
-	// A lone single white space (width == 1) is ordinary inter-word/inter-
-	// item spacing, not evidence of an intended background change - even at
-	// forContent - so it's dropped entirely rather than spent on a byte of
-	// any kind (matches how a single leading space embedded directly in real
-	// content already gets trimmed away for free elsewhere in flushSpan).
 	commitPendingWS := func(forContent bool, preserveWidth bool) {
 		width := pendingWSWidth
 		if width == 0 {
@@ -292,10 +274,6 @@ func parseMtvaTxtRows(body []byte, page string) [][]byte {
 				pendingWSWidth += len(spanBuf)
 			} else {
 				if pendingWSWidth > 0 {
-					// A differently-colored blank run is superseding this one - commit
-					// it now, preserving its full width (see commitPendingWS above).
-					// This can only happen mid-row (more content still follows, whether
-					// this new blank run or eventual real content), so forContent=true.
 					commitPendingWS(true, true)
 				}
 				pendingWSColor = spanColor
@@ -316,12 +294,6 @@ func parseMtvaTxtRows(body []byte, page string) [][]byte {
 				needed += 1 + len(s.data)
 			}
 			if pendingWSWidth > 1 && pendingWSColor == TCC_ALPHA_WHITE {
-				// width == 1 is dropped for free by commitPendingWS below, so it costs
-				// nothing here either. Any width >= 2 now always costs exactly 2 bytes -
-				// the [color, NEW_BACKGROUND] pair, with no padding beyond it (see
-				// commitPendingWS) - regardless of the pending run's original source
-				// width, so that fixed cost (not pendingWSWidth) is what the row budget
-				// check below needs to use.
 				const wsCost = 2
 				if over := wsCost + needed - (40 - col); over > 0 {
 					lastDot := -1
@@ -349,14 +321,9 @@ func parseMtvaTxtRows(body []byte, page string) [][]byte {
 						spanBuf = append(spanBuf[:cut], spanBuf[lastDot+1:]...)
 						over -= trim
 					}
-					// Anything still over after trimming decorative dots just means the row
-					// is genuinely too full for the rest of this content - writeByte's own
-					// bounds check safely drops whatever doesn't fit rather than panicking.
 				}
 			}
 
-			// The final pending run right before this real content: fixed 2-byte cost,
-			// no width preservation (see commitPendingWS's doc comment above).
 			commitPendingWS(true, false)
 
 			for _, s := range mtvaTxtSegmentContent(spanBuf) {
@@ -498,37 +465,12 @@ func parseMtvaTxtRows(body []byte, page string) [][]byte {
 		copy(pageBuffer[4][13:], pageBuffer[4][12:40])
 		pageBuffer[4][12] = 0x20
 
-		// correct mosaic block top right
-		/*
-			for i := 1; i < 5; i++ {
-				pageBuffer[i][32] = TCC_MOSAIC_WHITE
-				pageBuffer[i][33] = 0x7F
-				pageBuffer[i][34] = 0x7F
-			}
-		*/
-		//pageBuffer[3][15] = TCC_ALPHA_RED
-
-		//pageBuffer[13][0] = TCC_ALPHA_GREEN
-		//pageBuffer[13][1] = TCC_NEW_BACKGROUND
-
 		// move 'IMPRESSUM' to the right
 		copy(pageBuffer[20][20:], pageBuffer[20][0:20])
 		copy(pageBuffer[20][0:], "                    ")
 
-		r := 2
-		//c := 13
-		/*
-			pageBuffer[r][c] = TCC_ALPHA_WHITE
-			pageBuffer[r][c+1] = TCC_NEW_BACKGROUND
-			r++
-			pageBuffer[r][c] = TCC_ALPHA_WHITE
-			pageBuffer[r][c+1] = TCC_NEW_BACKGROUND
-			r++
-			pageBuffer[r][c] = TCC_ALPHA_GREEN
-			pageBuffer[r][c+1] = TCC_NEW_BACKGROUND
-		*/
 		// Make two rows double height
-		r = 10
+		r := 10
 		if pageBuffer[r][3] == 0x20 {
 			pageBuffer[r][3] = TCC_DOUBLE_HEIGHT
 		} else if pageBuffer[r][39] == 0x20 {
@@ -600,6 +542,7 @@ func parseMtvaTxtRows(body []byte, page string) [][]byte {
 
 	return pageBuffer
 }
+*/
 
 func mtvaTxtHeaderRow(page string) []byte {
 	row := make([]byte, 40)
@@ -611,4 +554,147 @@ func mtvaTxtHeaderRow(page string) []byte {
 	row[19] = TCC_ALPHA_YELLOW
 	copy(row[20:], []byte(time.Now().Format("2006.01.02.  15:04")))
 	return row
+}
+
+// GIF image conversion code below
+
+const (
+	mtvaTxtGIFBaseURL = "https://teletext.hu/mtv1/"
+	mtvaTxtCellW      = 13
+	mtvaTxtCellH      = 16
+)
+
+// How teletext.hu draws its pages (see imagetxt.go)
+var mtvaTxtProfile = &imgTxtProfile{
+	name:           "MTVA-TXT",
+	cellW:          mtvaTxtCellW,
+	cellH:          mtvaTxtCellH,
+	firstRow:       0,
+	rows:           25,
+	mosaicX:        [2][2]int{{0, 6}, {6, 13}},
+	mosaicY:        [3][2]int{{0, 5}, {5, 11}, {11, 16}},
+	separatedX:     [2][2]int{{1, 6}, {7, 12}},
+	separatedY:     [3][2]int{{0, 4}, {5, 10}, {11, 15}},
+	glyphs:         imgTxtBuildGlyphTable("mtvaTxtGlyphArt", mtvaTxtGlyphArt, mtvaTxtCellW, mtvaTxtCellH, mtvaTxtRuneToByte),
+	glyphTableName: "mtvaTxtGlyphArt",
+}
+
+// default fastext links
+var mtvaTxtDefaultFastext = []string{"101", "175", "200", "300"}
+
+type mtvaTxtHTMInfo struct {
+	prev, next       string   // "ppp-ss" or empty
+	prevSub, nextSub string   // "ppp-ss" or empty
+	image            string   // relative GIF path
+	fastext          []string // page numbers of the fastext row, left to right
+}
+
+var (
+	mtvaTxtHiddenRe = regexp.MustCompile(`(?i)id="(next|prev|nextSub|prevSub)"\s+value="([0-9-]*)"`)
+	mtvaTxtImageRe  = regexp.MustCompile(`(?i)<img\s+src="([^"]+\.gif)"`)
+	mtvaTxtAreaRe   = regexp.MustCompile(`(?i)coords="(\d+),(\d+),\d+,\d+"\s+href="(\d{3})-\d+\.htm"`)
+)
+
+func mtvaTxtGetGIFPage(page string, sub int, pageNr string) bool {
+	name := fmt.Sprintf("%s-%02d", page, sub)
+	htmURL := mtvaTxtGIFBaseURL + name + ".HTM"
+	logFetchingPage(htmURL)
+	htm, _, reachable := fetchMtvaTxtPage(htmURL)
+	if htm == nil {
+		return reachable
+	}
+	info := parseMtvaTxtHTM(htm, name)
+
+	gifData, _, reachable := fetchMtvaTxtPage(mtvaTxtGIFBaseURL + info.image)
+	if gifData == nil {
+		return reachable
+	}
+	img, err := gif.Decode(bytes.NewReader(gifData))
+	if err != nil {
+		fmt.Println("MTVA-TXT: GIF decode error:", err, "for", name)
+		return true
+	}
+	pageBuffer, unknown := imgTxtDecodeImage(img, mtvaTxtProfile)
+	if pageBuffer == nil {
+		fmt.Println("MTVA-TXT: unexpected GIF size", img.Bounds().Size(), "for", name)
+		return true
+	}
+	mtvaTxtProfile.logUnknownCells(name, unknown)
+	pageBuffer[0] = mtvaTxtHeaderRow(page)
+
+	var nav NavignationInfo
+	nav.prevPage, _ = mtvaTxtSplitPageName(info.prev)
+	nav.nextPage, _ = mtvaTxtSplitPageName(info.next)
+	_, nav.prevSubpage = mtvaTxtSplitPageName(info.prevSub)
+	_, nav.nextSubpage = mtvaTxtSplitPageName(info.nextSub)
+	pp, np := buildPageNavDirectives(nav.prevPage, nav.nextPage)
+	ps, ns, _ := getPrevNextSubpage(page, nav)
+
+	fastext := info.fastext
+	if len(fastext) == 0 {
+		fastext = mtvaTxtDefaultFastext
+	}
+	var output []byte
+	output = append(output, []byte(pp+np+ps+ns)...)
+	for _, f := range fastext {
+		output = append(output, []byte("ftl="+f+"\n")...)
+	}
+	output = append(output, []byte("<pre>")...)
+	for _, r := range pageBuffer {
+		output = append(output, r...)
+	}
+	output = append(output, []byte("</pre>")...)
+
+	savePage(DirMTVATXT, pageNr, output)
+	return true
+}
+
+func parseMtvaTxtHTM(htm []byte, name string) mtvaTxtHTMInfo {
+	info := mtvaTxtHTMInfo{image: "images/" + strings.ToLower(name) + ".gif"}
+	for _, m := range mtvaTxtHiddenRe.FindAllSubmatch(htm, -1) {
+		v := string(m[2])
+		switch strings.ToLower(string(m[1])) {
+		case "next":
+			info.next = v
+		case "prev":
+			info.prev = v
+		case "nextsub":
+			info.nextSub = v
+		case "prevsub":
+			info.prevSub = v
+		}
+	}
+	if m := mtvaTxtImageRe.FindSubmatch(htm); m != nil {
+		info.image = string(m[1])
+	}
+	// The image map links on the fastext row (y = 384) are the fastext links
+	type link struct {
+		x    int
+		page string
+	}
+	var links []link
+	for _, m := range mtvaTxtAreaRe.FindAllSubmatch(htm, -1) {
+		x, _ := strconv.Atoi(string(m[1]))
+		y, _ := strconv.Atoi(string(m[2]))
+		if y == 24*mtvaTxtCellH {
+			links = append(links, link{x, string(m[3])})
+		}
+	}
+	sort.Slice(links, func(i, j int) bool { return links[i].x < links[j].x })
+	for _, l := range links {
+		if len(info.fastext) < 4 {
+			info.fastext = append(info.fastext, l.page)
+		}
+	}
+	return info
+}
+
+func mtvaTxtSplitPageName(s string) (int, int) {
+	parts := strings.SplitN(s, "-", 2)
+	page, _ := strconv.Atoi(parts[0])
+	sub := 0
+	if len(parts) == 2 {
+		sub, _ = strconv.Atoi(parts[1])
+	}
+	return page, sub
 }

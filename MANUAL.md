@@ -11,19 +11,22 @@
 |←| Go back to the WiC64 Portal (only supported in the standalone WiC64 PRG version)|
 |, | Subpage up |
 |. | Subpage down |
+|£ | Enter a 2-digit subpage number (00..99) |
 |Cursor keys or WASD | Quick Navgiation |
 |RETURN or E | Select and go to pagenumber |
 |R | Refresh Teletext page |
 |P | Print Teletext page |
-|Space | Stop/Continue auto rotating subpages |
+|Space | Hold/Continue auto rotating subpages |
 |T | Toggle between bold/thin font |
-|/ | Switch station (carousel) |
-|M | Switch station (menu list) - Navigatge: cursor left/right, up/down or type first letter for quick select; RETURN selects station |
+|/ | Switch station forward |
+|? | Switch station backward |
+|M | Station select menu - Navigate: cursor left/right, up/down or type first letter for quick select; RETURN selects station |
 |C | Shows/hides concealed text |
 |F1 | Fastext red |
 |F3 | Fastext green |
 |F5 | Fastext yellow |
 |F7 | Fastext cyan |
+|F4 | Toggles Stopwatch ON/OFF |
 |F8 | new: User's Guide as a Teletext service!|
 
 ## Mouse operation
@@ -59,4 +62,4 @@ With this program you configure:
 |F3 | Exit the program |
 
 ## PetsciiProxy 
-Using the public petsciiproxy.nl server is the default setting. But if you do want to run it locally you could. This runs on your PC (or Mac/Linux/NAS/..) and acts as a bridge between the internet and your C64 Ultimate/Other Ultimate product running Teletext64U. The default listening port is 8080. You can change the port by starting PetsciiProxy with a command line parameter. Start the program with --help for all parameter options.
+Using the public petsciiproxy.nl server is the default setting. But if you do want to run an instance of PetsciiProxy yourself, you could. Run it on a PC (Windows/Mac/Linux), NAS or RaspberryPi. It acts as a bridge between the internet and your C64 running Teletext64U. The default listening port is 8080. You can change the port by starting PetsciiProxy with a command line parameter. There is also an option to use your personal key for Yle Teksti-TV (Teletext from Finland). Start the program with --help for all parameter options.

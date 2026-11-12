@@ -1,3 +1,6 @@
+// PetsciiProxy - Copyright (C) 2026 Frank Putman
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package main
 
 import (
@@ -90,7 +93,7 @@ func scanPageLinks(body []byte) string {
 			} else {
 				prev := rowBytes[startIdx-1]
 				// 0x5D is the Italian right arrow character; it is being used as a seperator on RAI TELEVIDEO page 401 for example
-				if prev == ' ' || prev == 'p' || prev == 'P' || prev == '>' || prev == '-' || prev == ',' || prev == '.' || prev == '/' || prev == 0x5D || prev < 32 {
+				if prev == ' ' || prev == 'p' || prev == 'P' || prev == '>' || prev == '-' || prev == ',' || prev == '.' || prev == '/' || prev == '+' || prev == 0x5D || prev < 32 {
 					validPrefix = true
 				}
 			}
@@ -104,7 +107,7 @@ func scanPageLinks(body []byte) string {
 				validSuffix = true
 			} else {
 				next := rowBytes[endIdx]
-				if next == ' ' || next == ',' || next == '.' || next == '-' || next == '/' || next == '\n' || next == 0x5D || next < 32 {
+				if next == ' ' || next == ',' || next == '.' || next == '-' || next == '/' || next == '+' || next == '\n' || next == 0x5D || next < 32 {
 					validSuffix = true
 				}
 				if next == ',' || next == '.' {

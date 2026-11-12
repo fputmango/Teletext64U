@@ -1,3 +1,10 @@
+// --- ZDF-TEXT ---
+//
+// German Teletext service
+//
+// Copyright (C) 2026 Frank Putman
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package main
 
 import (
@@ -17,8 +24,6 @@ import (
 )
 
 var tagRegex = regexp.MustCompile(`\{([A-Za-z0-9]+)\}`)
-
-// --- ZDF-TEXT ---
 
 func evalUnary(jsSnippet string) int {
 	// The JS challenge builds digits like this: (+!+[]+!![]+!![]) = 3

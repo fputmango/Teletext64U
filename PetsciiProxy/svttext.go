@@ -1,3 +1,10 @@
+// --- SVT Text ---
+//
+// Swedish Teletext service
+//
+// Copyright (C) 2026 Frank Putman
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package main
 
 import (
@@ -12,7 +19,6 @@ import (
 	"golang.org/x/net/html"
 )
 
-// SVT Text
 var svtColorMap = map[string]byte{
 	"Bl": 0, // Black
 	"R":  1, // Red

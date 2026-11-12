@@ -1,3 +1,18 @@
+// --- User Config (UD) ---
+//
+// Stores per-user config as a 7-byte binary file in the UD/ folder, keyed by the MAC-address of the client
+//
+// Endpoints (firmware sends uppercase; server accepts both):
+//   GET /ud/{mac}/r           → check: \x00 if config exists, \x01 if not
+//   GET /ud/{mac}/l           → load:  \x00\x07<7 bytes> on success, \x01 if not found
+//   GET /ud/{mac}/s/{hexdata} → save:  \x00 on success, \x01 on error
+//
+// Config layout (7 bytes, little-endian):
+//   [0-1] refreshtime  [2-3] cycletime  [4] station  [5-6] startpage
+//
+// Copyright (C) 2026 Frank Putman
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package main
 
 import (
@@ -8,18 +23,6 @@ import (
 	"strconv"
 	"strings"
 )
-
-// --- User Config (UD)
-//
-// Stores per-user config as a 7-byte binary file in the UD/ folder, keyed by MAC address.
-//
-// Endpoints (firmware sends uppercase; server accepts both):
-//   GET /ud/{mac}/r           → check: \x00 if config exists, \x01 if not
-//   GET /ud/{mac}/l           → load:  \x00\x07<7 bytes> on success, \x01 if not found
-//   GET /ud/{mac}/s/{hexdata} → save:  \x00 on success, \x01 on error
-//
-// Config layout (7 bytes, little-endian):
-//   [0-1] refreshtime  [2-3] cycletime  [4] station  [5-6] startpage
 
 func udHandler(w http.ResponseWriter, r *http.Request) {
 	// Normalise to lowercase (firmware uppercases the entire path)

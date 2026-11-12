@@ -1,3 +1,19 @@
+// --- SRG ---
+//
+// Swiss Teletext services in multiple languages:
+// SRF 1, SRF 2, SRF Info / RTS 1, RTS 2 / RSI LA 1, RSI LA 2
+//
+// SRG because these stations are all part of the Swiss Broadcasting Corporation (SRG SSR)
+//
+// Like NOS-TT it doesn't need a parser function because we get the data in raw teletext binary
+//
+// A small SPA that fetches page data as JSON from:
+//   GET https://api.teletext.ch/channels/{channel}/pages/{pageNumber}
+// Every subpage entry contains "ep1Info.data.ep1Format.content": the raw teletext row data, base64 encoded.
+//
+// Copyright (C) 2026 Frank Putman
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package main
 
 import (
@@ -10,15 +26,6 @@ import (
 	"strings"
 	"time"
 )
-
-// --- SRG (SRF 1, SRF 2, SRF Info / RTS 1, RTS 2 / RSI LA 1, RSI LA 2) ---
-// SRG because these stations are all part of the Swiss Broadcasting Corporation (SRG SSR)
-//
-// Like NOS-TT it doesn't need a parser function because we get the data in raw teletext binary
-//
-// A small SPA that fetches page data as JSON from:
-//   GET https://api.teletext.ch/channels/{channel}/pages/{pageNumber}
-// Every subpage entry contains "ep1Info.data.ep1Format.content": the raw teletext row data, base64 encoded.
 
 type ttchEp1Format struct {
 	Content string `json:"content"`

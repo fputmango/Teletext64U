@@ -1,3 +1,10 @@
+// --- NDR Text ---
+//
+// German Teletext service
+//
+// Copyright (C) 2026 Frank Putman
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package main
 
 import (
@@ -11,8 +18,6 @@ import (
 
 	"golang.org/x/net/html"
 )
-
-// --- NDR Text ---
 
 type ndrCell struct {
 	ch        rune // text character (when !mosaic)
@@ -243,11 +248,11 @@ func parseNDRPage(body io.Reader) ([][]ndrCell, NavignationInfo, error) {
 }
 
 /*
-the teletext mosaic, which is a 2x3 block like below, can be represented as a byte
+the teletext mosaic, which is a 2x3 block like below, is represented as a byte
 [b0][b1]
 [b2][b3]
 [b4][b5]
-in the output byte bits b7 and b5 are always 1 because of the 0x80 and 0x20
+in the output byte bits b7 and b5 must always 1 (enforced by the 0x80 and 0x20)
 bits b0..b4 are passed unchanged (v & 0x1F)
 b5 is shifted 1 left to put it in output bit 6
 for example:
@@ -259,19 +264,9 @@ func ndrSextantToTeletext(v byte) byte {
 	return (0x20 | (v & 0x1F) | ((v & 0x20) << 1)) | 0x80
 }
 
-// Turns one row of cells into 40 bytes of teletext data. Control codes are placed in blank cells:
-//  1. a blank cell that must show a different background gets New Background (or Black Background);
-//  2. a blank cell right before a background change gets the colour code that New Background copies;
-//  3. otherwise a blank cell gets the colour / mosaic code the next visible character needs,
-//     or the Separated / Contiguous Graphics code a mosaic character needs.
-//
-// The weather maps (665/666) change colour between adjacent mosaics without a blank cell in between
-// (the broadcast uses Hold Graphics for that). There one mosaic cell is given up for the control code,
-// preferably one that repeats its left neighbour, so colours don't bleed into the next region.
 func ndrEncodeRow(cells []ndrCell) []byte {
 	out := newPageBuffer(1)[0]
 
-	// Pad short rows with the attributes of the last cell, so the padding doesn't need control codes
 	for len(cells) < 40 {
 		pad := ndrCell{ch: ' ', fg: TCC_ALPHA_WHITE, bg: TCC_ALPHA_BLACK}
 		if len(cells) > 0 {
@@ -282,11 +277,10 @@ func ndrEncodeRow(cells []ndrCell) []byte {
 
 	fg, bg, mosaic, separated := byte(TCC_ALPHA_WHITE), byte(TCC_ALPHA_BLACK), false, false
 
-	// Does cell n need a control code with the current state?
 	needsCode := func(n ndrCell) bool {
 		return n.fg != fg || n.mosaic != mosaic || (n.mosaic && n.separated != separated)
 	}
-	// Returns the control code cell n needs and updates the state accordingly
+
 	codeFor := func(n ndrCell) byte {
 		if n.fg != fg || n.mosaic != mosaic {
 			fg, mosaic = n.fg, n.mosaic
@@ -307,7 +301,6 @@ func ndrEncodeRow(cells []ndrCell) []byte {
 
 		if !c.blank() {
 			if c.mosaic && c.bg == bg {
-				// No blank cell was left for the code this mosaic needs: use this cell for it
 				if needsCode(c) {
 					out[i] = codeFor(c)
 					continue

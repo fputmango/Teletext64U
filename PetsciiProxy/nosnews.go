@@ -1,6 +1,6 @@
-package main
-
-// NOS Nieuws: RSS-generated teletext pages
+// --- NOS Nieuws ---
+//
+// Dutch Teletext service made from the NOS Nieuws RSS-feeds
 //
 // Templates:
 // - in folder assets/nosnews/
@@ -26,6 +26,11 @@ package main
 //
 // <shortdate> is optional, index-template only: placed  before <headline> on that same row to print
 // a compact date ahead of the headline text.
+//
+// Copyright (C) 2026 Frank Putman
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package main
 
 import (
 	"bytes"

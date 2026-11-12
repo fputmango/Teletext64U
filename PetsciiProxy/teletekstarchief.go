@@ -1,3 +1,14 @@
+// --- NOS Archief ---
+//
+// An archive of old and historical NOS Teletekst pages. See teletekstarchief.nl
+//
+// The reason it is called NOS Archief has to do with the max name length of Teletext services in
+// the Teletext 64 Ultimate client program (13 characters). And it are all NOS Teletekst pages from
+// the past.
+//
+// Copyright (C) 2026 Frank Putman
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package main
 
 import (
@@ -12,27 +23,6 @@ import (
 	"strings"
 	"time"
 )
-
-// --- Teletekst Archief (teletekstarchief.nl) ---
-//
-// An archive of reconstructed NOS Teletekst pages.
-//
-//   GET https://teletekstarchief.nl/archive-json/{page}[-{subpage}]
-//
-// returns JSON with prev/next page and subpage IDs (as strings, e.g. "114", "111-2") and
-// "binaryDisplay": 960 bytes (40x24, rows 0..23) of Level-1 teletext, base64 encoded.
-// Row 0 is the original header as it was captured (e.g. "P111  NOS-TT  111 vr 12 mei 17:32:03"),
-// so it is kept as-is instead of being replaced by a generated header.
-// Note: /json/{id} returns the same data but with a blank header row, hence /archive-json.
-//
-//   GET https://teletekstarchief.nl/meta-json/{page}[-{subpage}]
-//
-// returns optional metadata that the archive's web viewer shows below the page: snapshot date,
-// source, notes and rows lost in the original capture. It is put on row 24 (normally fastext,
-// which this archive doesn't have). The subpage interval is used as cycle time.
-//
-// Subpage numbers can have gaps (e.g. 101-4 is followed by 101-10), so navigation is taken
-// verbatim from the JSON rather than computed.
 
 type teletekstarchiefPage struct {
 	PrevPage      string `json:"prevPage"`
