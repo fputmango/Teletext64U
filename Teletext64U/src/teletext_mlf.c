@@ -413,7 +413,7 @@ bool fetch_font_file(FontFileKind kind, bool thin, unsigned char *dest, unsigned
 	unsigned int total = 0;
 
 	strcpy(url, "http://" PETSCIIPROXY "/fonts/");
-	strcat(url, font_filenames[kind][thin ? 1 : 0]);
+	strcat(url, font_filename(kind, thin));
 
 	if (cbm_open(CBM_LOGICAL_FILE_NUMBER, mlf_http_device, CBM_SEC_ADDR, url) != 0) {
 		return false;

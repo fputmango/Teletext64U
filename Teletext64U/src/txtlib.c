@@ -69,7 +69,10 @@ const Station stations[] = {
 	{"TLGZ-HIS", 					"Telegaz Hist.", TXT_LANG_POLISH},
 	{"TLGZ-SPO", 					"Telegaz Sport", TXT_LANG_POLISH},
 	{"TLGZ-SAT", 					"Telegaz Polon", TXT_LANG_POLISH},
-	{"TELETEXT64",   			"Teletext 64  ", TXT_LANG_ENGLISH},					// Hidden in the menu. This is (F8) User's Guide as Teletext service
+	{"ANTENA3", 					"Antena 3     ", TXT_LANG_SPANISH, TXT_G2_SPANISH},
+	{"LASEXTA", 					"laSexta      ", TXT_LANG_SPANISH, TXT_G2_SPANISH},
+	{"RTP", 							"RTP Teletexto", TXT_LANG_SPANISH, TXT_G2_PORTUGUESE},	// Portuguese: shares national option subset with Spanish
+	{"TELETEXT64",   			"Teletext 64  ", TXT_LANG_ENGLISH},											// Hidden in the menu. This is (F8) User's Guide as Teletext service
 };
 
 // Compile time check: gets negative if the number of stations[] items not equal to the STATION_ list in txtlib.h

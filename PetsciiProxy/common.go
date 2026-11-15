@@ -265,7 +265,7 @@ func insertPageLinks(output []byte) []byte {
 		var result []byte
 		if ftlIndex < len(ftlPositions) {
 			col, width := ftlPositions[ftlIndex][0], ftlPositions[ftlIndex][1]
-			result = []byte(fmt.Sprintf("%s,%02d,%02d", id, col, width))
+			result = fmt.Appendf(nil, "%s,%02d,%02d", id, col, width)
 		} else {
 			result = id // no matching color segment found on row 24 - keep just the target page ID
 		}
@@ -425,30 +425,12 @@ func buildPageNavDirectives(prevPage, nextPage int) (pp, np string) {
 	return pp, np
 }
 
-func bytesToLatin1String(b []byte) string {
-	r := make([]rune, len(b))
-	for i, v := range b {
-		r[i] = rune(v) // Force each byte to be its own Unicode point
-	}
-	return string(r)
-}
-
 // Helper to ensure we don't write out of bounds
 func writeToBuffer(buffer [][]byte, row *int, col *int, b byte) {
 	if *row >= 0 && *row < 25 && *col >= 0 && *col < 40 {
 		buffer[*row][*col] = b
 		*col++
 	}
-}
-
-func handleStaticFile(w http.ResponseWriter, filename string) {
-	data, err := os.ReadFile(filename)
-	if err != nil {
-		http.Error(w, "Static file not found.", 404)
-		return
-	}
-	w.WriteHeader(200)
-	w.Write(data)
 }
 
 func sendErrorMsg(w http.ResponseWriter, code int, message string) {

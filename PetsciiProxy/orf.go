@@ -66,8 +66,7 @@ func orfGetTeletexPage(pageNr string, station string, dirStation string) bool {
 		ftl3 = "300" // Fernsehen
 	}
 	var output []byte
-	output = append(output, []byte(fmt.Sprintf(
-		"%v%v%v%v%vftl=%v\nftl=%v\nftl=%v\nftl=%v\n<pre>", pp, np, ps, ns, ct, ftl1, ftl2, ftl3, ftl4))...)
+	output = fmt.Appendf(output, "%v%v%v%v%vftl=%v\nftl=%v\nftl=%v\nftl=%v\n<pre>", pp, np, ps, ns, ct, ftl1, ftl2, ftl3, ftl4)
 
 	row0 := make([]byte, 40)
 	for i := range row0 {
@@ -215,9 +214,10 @@ func parseORFRows(body io.Reader, station string, pageNr string) ([][]byte, Navi
 					if innerTT == html.StartTagToken && innerToken.Data == "a" {
 						var subClass, subHref string
 						for _, a := range innerToken.Attr {
-							if a.Key == "class" {
+							switch a.Key {
+							case "class":
 								subClass = a.Val
-							} else if a.Key == "href" {
+							case "href":
 								subHref = a.Val
 							}
 						}

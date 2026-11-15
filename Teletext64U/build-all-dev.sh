@@ -55,14 +55,14 @@ DISK_IMAGE=Teletext64U.d64
 c1541 -format "teletext64u,sh" d64 $DISK_IMAGE \
 -write teletext64u.prg teletext64u \
 -write config.prg config \
--write ../config/ut64.cfg.prg ut64.cfg \
+-write ../config/ut64.cfg-localserver.prg ut64.cfg \
 
 DISK_IMAGE=Teletext64W.d64
 
 c1541 -format "teletext64w,sh" d64 $DISK_IMAGE \
 -write teletext64-wic64-disk.prg teletext64w \
 -write config.prg config \
--write ../config/ut64.cfg.prg ut64.cfg \
+-write ../config/ut64.cfg-localserver.prg ut64.cfg \
 
 rm -f teletext64u.prg
 rm -f teletext64-wic64-disk.prg

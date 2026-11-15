@@ -44,7 +44,7 @@ func hrtextGetTeletexPage(pageNr string) bool {
 		return true
 	}
 
-	rows, nav := parseHRRows(resp.Body, parts[0], parts[1])
+	rows, nav := parseHRRows(resp.Body)
 
 	// Optional directives for (sub)page navigation
 	pp := ""
@@ -66,8 +66,7 @@ func hrtextGetTeletexPage(pageNr string) bool {
 	ftl.ftl4 = "200"
 
 	var output []byte
-	output = append(output, []byte(fmt.Sprintf(
-		"%v%v%v%v%vftl=%v\nftl=%v\nftl=%v\nftl=%v\n<pre>", pp, np, ps, ns, ct, ftl.ftl1, ftl.ftl2, ftl.ftl3, ftl.ftl4))...)
+	output = fmt.Appendf(output, "%v%v%v%v%vftl=%v\nftl=%v\nftl=%v\nftl=%v\n<pre>", pp, np, ps, ns, ct, ftl.ftl1, ftl.ftl2, ftl.ftl3, ftl.ftl4)
 
 	row0 := make([]byte, 40)
 	for i := range row0 {
@@ -124,7 +123,7 @@ func swrGetTeletexPage(pageNr string, station string, dirStation string) bool {
 		return true
 	}
 
-	rows, nav := parseHRRows(resp.Body, parts[0], parts[1])
+	rows, nav := parseHRRows(resp.Body)
 
 	// Optional directives for (sub)page navigation
 	pp := ""
@@ -147,8 +146,7 @@ func swrGetTeletexPage(pageNr string, station string, dirStation string) bool {
 	ftl.ftl4 = "200"
 
 	var output []byte
-	output = append(output, []byte(fmt.Sprintf(
-		"%v%v%v%v%vftl=%v\nftl=%v\nftl=%v\nftl=%v\n<pre>", pp, np, ps, ns, ct, ftl.ftl1, ftl.ftl2, ftl.ftl3, ftl.ftl4))...)
+	output = fmt.Appendf(output, "%v%v%v%v%vftl=%v\nftl=%v\nftl=%v\nftl=%v\n<pre>", pp, np, ps, ns, ct, ftl.ftl1, ftl.ftl2, ftl.ftl3, ftl.ftl4)
 
 	row0 := make([]byte, 40)
 	for i := range row0 {
@@ -194,7 +192,7 @@ var hrBgRe = regexp.MustCompile(`^bg([0-7])$`)
 var hrFgRe = regexp.MustCompile(`^fg([0-7])$`)
 var hrMosaicRe = regexp.MustCompile(`^g1([cs])([0-7])([0-9a-fA-F]{2})$`)
 
-func parseHRRows(body io.Reader, pageNr string, subpageStr string) ([][]byte, NavignationInfo) {
+func parseHRRows(body io.Reader) ([][]byte, NavignationInfo) {
 	var nav NavignationInfo
 
 	// Initialize buffer with 25 rows, 40 spaces each

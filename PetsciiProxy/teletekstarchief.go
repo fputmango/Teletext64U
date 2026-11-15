@@ -199,6 +199,7 @@ func teletekstarchiefInfoRow(meta teletekstarchiefMeta) []byte {
 }
 
 // Formats the valid missing row numbers (1..24) as compact ranges, e.g. "r.3-5,9 ontbreekt"
+/*
 func teletekstarchiefMissingRows(rows []int) string {
 	seen := map[int]bool{}
 	var valid []int
@@ -237,28 +238,31 @@ func teletekstarchiefMissingRows(rows []int) string {
 	flush()
 	return "r." + strings.Join(parts, ",") + " ontbreekt"
 }
+*/
 
-func makeShortDate(longDate string) string {
-	var dayStr, monthStr, yearStr string
-	monthNum := map[string]string{"jan": "1", "feb": "2", "maa": "3", "apr": "4", "mei": "5", "jun": "6",
-		"jul": "7", "aug": "8", "sep": "9", "okt": "10", "nov": "11", "dec": "12"}
+/*
+	func makeShortDate(longDate string) string {
+		var dayStr, monthStr, yearStr string
+		monthNum := map[string]string{"jan": "1", "feb": "2", "maa": "3", "apr": "4", "mei": "5", "jun": "6",
+			"jul": "7", "aug": "8", "sep": "9", "okt": "10", "nov": "11", "dec": "12"}
 
-	parts := strings.Fields(longDate)
-	switch len(parts) {
-	case 3:
-		dayStr = parts[0]
-		monthStr = monthNum[parts[1]]
-		yearStr = parts[2]
-	case 4:
-		dayStr = parts[1]
-		monthStr = monthNum[parts[2]]
-		yearStr = parts[3]
-	default:
-		return ""
+		parts := strings.Fields(longDate)
+		switch len(parts) {
+		case 3:
+			dayStr = parts[0]
+			monthStr = monthNum[parts[1]]
+			yearStr = parts[2]
+		case 4:
+			dayStr = parts[1]
+			monthStr = monthNum[parts[2]]
+			yearStr = parts[3]
+		default:
+			return ""
+		}
+
+		return fmt.Sprintf("%s-%s-%s", dayStr, monthStr, yearStr)
 	}
-
-	return fmt.Sprintf("%s-%s-%s", dayStr, monthStr, yearStr)
-}
+*/
 
 func getYear(longDate string) string {
 	var yearStr string

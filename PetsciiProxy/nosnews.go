@@ -958,7 +958,7 @@ func renderIndexPage(cat *nosNewsCategory, sub int) []byte {
 			}
 			if i == len(lines)-1 {
 				row[pColorCol] = pPrefix
-				copy(row[pCol:], []byte(fmt.Sprintf("%3d", a.pageNr)))
+				copy(row[pCol:], fmt.Appendf(nil, "%3d", a.pageNr))
 			}
 			block = append(block, row)
 		}
@@ -1016,7 +1016,7 @@ func renderIndexPage(cat *nosNewsCategory, sub int) []byte {
 }
 
 // builds page 100
-func renderMasterIndexPage(sub int) []byte {
+func renderMasterIndexPage() []byte {
 	tpl := nosnewsMasterTpl
 	out := make([]byte, len(tpl))
 	copy(out, tpl)
@@ -1060,7 +1060,7 @@ func renderMasterIndexPage(sub int) []byte {
 		}
 		if pFound {
 			line[pCol-1] = pPrefix
-			copy(line[pCol:], []byte(fmt.Sprintf("%3d", c.indexPage)))
+			copy(line[pCol:], fmt.Appendf(nil, "%3d", c.indexPage))
 		}
 		copy(out[row*40:(row+1)*40], line)
 	}
@@ -1236,7 +1236,7 @@ func nosnewsGetTeletexPage(pageNr string) bool {
 	}
 
 	if base == strconv.Itoa(nosNewsMasterPage) {
-		savePage(DirNOSNEWS, pageNr, renderMasterIndexPage(sub))
+		savePage(DirNOSNEWS, pageNr, renderMasterIndexPage())
 		return true
 	}
 

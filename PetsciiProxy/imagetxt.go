@@ -3,6 +3,8 @@
 // Currently used by:
 // - mtvatxt.go, serves GIF-images
 // - telegazeta.go, serves PNG-images
+// - atresmedia.go, serves PNG-images
+// - rtp.go, serves PNG-images
 //
 // Each cell in the image has the same size, and consits of 2 colours. Each cell can be recognised exactly:
 //   - text characters through a glyph table (see the specific <station>_glyphs.go files)
@@ -29,6 +31,8 @@ import (
 	"image/color"
 	"io"
 	"net/http"
+	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -60,9 +64,50 @@ type imgTxtProfile struct {
 	logged   map[string]bool // unknown cell pictures already logged
 }
 
+// Some servers (e.g. Antena 3) refuse Go's default User-Agent with a 403, so it presents itself as a browser
+const imgTxtUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+
+var (
+	imgTxtClientsMu sync.Mutex
+	imgTxtClients   = map[string]*http.Client{}
+)
+
+// imgTxtClient returns the HTTP client of a station (name = profile name, e.g. "RTP"); it is made once and reused.
+// When the environment variable <name>_PROXY is set, e.g. RTP_PROXY=http://user:password@host:port, the requests of
+// that station go through that proxy. This is for broadcasters that block the network of the server (RTP blocks
+// hosting providers). Without the variable the requests go directly.
+func imgTxtClient(name string) *http.Client {
+	imgTxtClientsMu.Lock()
+	defer imgTxtClientsMu.Unlock()
+	if c, ok := imgTxtClients[name]; ok {
+		return c
+	}
+	c := &http.Client{Timeout: 10 * time.Second}
+	if v := strings.TrimSpace(os.Getenv(name + "_PROXY")); v != "" {
+		proxyURL, err := url.Parse(v)
+		if err != nil || proxyURL.Host == "" {
+			// the value is not printed: it holds the password
+			fmt.Printf("%s: %s_PROXY is not a valid URL, fetching directly\n", name, name)
+		} else {
+			t := http.DefaultTransport.(*http.Transport).Clone()
+			t.Proxy = http.ProxyURL(proxyURL)
+			c.Transport = t
+			fmt.Printf("%s: using proxy %s\n", name, proxyURL.Host)
+		}
+	}
+	imgTxtClients[name] = c
+	return c
+}
+
 func imgTxtFetch(name, url string) ([]byte, int, bool) {
-	client := http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Get(url)
+	client := imgTxtClient(name)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		fmt.Println(name+": bad URL:", err)
+		return nil, 0, true
+	}
+	req.Header.Set("User-Agent", imgTxtUserAgent)
+	resp, err := client.Do(req)
 	if err != nil {
 		fmt.Println(name+": connection error:", err)
 		return nil, 0, false

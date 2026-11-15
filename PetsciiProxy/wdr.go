@@ -98,8 +98,7 @@ func wdrtextGetTeletexPage(pageNr string) bool {
 	}
 
 	var output []byte
-	output = append(output, []byte(fmt.Sprintf(
-		"%v%v%v%v%vftl=%v\nftl=%v\nftl=%v\nftl=%v\n<pre>", pp, np, ps, ns, ct, ftl.ftl1, ftl.ftl2, ftl.ftl3, ftl.ftl4))...)
+	output = fmt.Appendf(output, "%v%v%v%v%vftl=%v\nftl=%v\nftl=%v\nftl=%v\n<pre>", pp, np, ps, ns, ct, ftl.ftl1, ftl.ftl2, ftl.ftl3, ftl.ftl4)
 
 	row0 := make([]byte, 40)
 	for i := range row0 {

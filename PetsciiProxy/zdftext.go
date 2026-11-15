@@ -227,8 +227,7 @@ func zdftextGetTeletexPage(pageNr string, zdfStation string, dirStation string) 
 		ftl4 = "400"
 	}
 	var output []byte
-	output = append(output, []byte(fmt.Sprintf(
-		"%v%v%v%vftl=100\nftl=%v\nftl=%v\nftl=%v\n<pre>", pp, np, ps, ns, ftl2, ftl3, ftl4))...)
+	output = fmt.Appendf(output, "%v%v%v%vftl=100\nftl=%v\nftl=%v\nftl=%v\n<pre>", pp, np, ps, ns, ftl2, ftl3, ftl4)
 
 	for _, r := range rows {
 		output = append(output, r...)

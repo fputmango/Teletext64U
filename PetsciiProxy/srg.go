@@ -172,9 +172,7 @@ func srgGetTeletexPage(pageNr string, channel string, dirStation string) bool {
 	ftl.ftl4 = "700"
 
 	var output []byte
-	output = append(output, []byte(fmt.Sprintf(
-		"%s%s%s%s%sftl=%s\nftl=%s\nftl=%s\nftl=%s\n<pre>",
-		pp, np, ps, ns, ct, ftl.ftl1, ftl.ftl2, ftl.ftl3, ftl.ftl4))...)
+	output = fmt.Appendf(output, "%s%s%s%s%sftl=%s\nftl=%s\nftl=%s\nftl=%s\n<pre>", pp, np, ps, ns, ct, ftl.ftl1, ftl.ftl2, ftl.ftl3, ftl.ftl4)
 	output = append(output, row0...)
 	output = append(output, fullPage...)
 	output = append(output, row24...)

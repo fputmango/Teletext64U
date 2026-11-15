@@ -332,7 +332,7 @@ static unsigned int uci_http_get(const char *path, unsigned char *dest, unsigned
 bool fetch_font_file(FontFileKind kind, bool thin, unsigned char *dest, unsigned int len) {
 #define path ((char*)(UCI_NETBUF + UCI_PATH_OFFSET))
 	strcpy(path, "/fonts/");
-	strcat(path, font_filenames[kind][thin ? 1 : 0]);
+	strcat(path, font_filename(kind, thin));
 	return uci_http_get(path, dest, len) == len;
 #undef path
 }

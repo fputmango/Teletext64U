@@ -7,6 +7,7 @@
 !MANUAL.md
 !LICENSE
 !THIRD-PARTY-NOTICES
+!SERVICES.md
 
 # Allowed to publish
 !/docs/
@@ -14,10 +15,14 @@
 
 !/images/
 !/images/*
+!/images/services/
+!/images/services/*.png
 
 !/PetsciiProxy/
 /PetsciiProxy/*
 !/PetsciiProxy/ardtext.go
+!/PetsciiProxy/atresmedia.go
+!/PetsciiProxy/atresmedia_glyphs.go
 !/PetsciiProxy/common.go
 !/PetsciiProxy/dr.go
 !/PetsciiProxy/forum64.go
@@ -31,6 +36,8 @@
 !/PetsciiProxy/nosnews.go
 !/PetsciiProxy/nostt.go
 !/PetsciiProxy/orf.go
+!/PetsciiProxy/rtp.go
+!/PetsciiProxy/rtp_glyphs.go
 !/PetsciiProxy/srg.go
 !/PetsciiProxy/svttext.go
 !/PetsciiProxy/tekstitv.go

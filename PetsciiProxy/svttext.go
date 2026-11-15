@@ -72,9 +72,7 @@ func svttextGetTeletexPage(pageNr string) bool {
 	}
 
 	var output []byte
-	output = append(output, []byte(fmt.Sprintf(
-		"pn=p_\npn=n_\n%v%vftl=100\nftl=300\nftl=400\nftl=700\n<pre>",
-		ps, ns))...)
+	output = fmt.Appendf(output, "pn=p_\npn=n_\n%v%vftl=100\nftl=300\nftl=400\nftl=700\n<pre>", ps, ns)
 
 	// create row 0 / header line
 	row0 := make([]byte, 40)

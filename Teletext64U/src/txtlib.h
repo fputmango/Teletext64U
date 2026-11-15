@@ -19,7 +19,7 @@ void get_teletext_page_str(const char *pageStr, int subPageNumber);
 
 #define JIFFIES_PER_SECOND 60
 
-#define TELETEXT64_VERSION "2.9.0"
+#define TELETEXT64_VERSION "2.10.0"
 
 #define MAX(a, b) ((a) > (b) ? (a) : b)
 
@@ -45,6 +45,7 @@ void get_teletext_page_str(const char *pageStr, int subPageNumber);
 #define KEY_F						70
 #define KEY_H						72
 #define KEY_I						73
+#define KEY_L						76
 #define KEY_M						77		// menu station select
 #define KEY_N						78
 #define KEY_O						79
@@ -124,6 +125,9 @@ extern unsigned long refresh_interval_jiffies;
 // In real teletext this info can be in each Teletext page. Not implemented to save memory.
 // More info: ETS 300 706 reference guide, page 115, Table 36: Latin National Option Sub-sets
 // https://www.etsi.org/deliver/etsi_i_ets/300700_300799/300706/01_60/ets_300706e01p.pdf
+//
+// note: character sets are stored in the teletext-bold-g2.bin/teletext-thin-g2.bin files
+//
 #define TXT_LANG_ENGLISH					0x00
 #define TXT_LANG_FRENCH						0x10
 #define TXT_LANG_SWEDISH_FINNISH	0x20
@@ -132,10 +136,17 @@ extern unsigned long refresh_interval_jiffies;
 #define TXT_LANG_ITALIAN					0x50
 #define TXT_LANG_POLISH						0x60
 
+// next to the existing g2 character sets above, g2 country specific characters are available
+// The bank files and the byte mapping are in teletext_common.c.
+#define TXT_G2_DEFAULT						0
+#define TXT_G2_SPANISH						1		// teletext-bold-sp-g2.bin / teletext-thin-sp-g2.bin
+#define TXT_G2_PORTUGUESE					2		// teletext-bold-pt-g2.bin / teletext-thin-pt-g2.bin
+
 typedef struct {
 	const char* url_name;
 	const char* menu_name;
 	unsigned char lang;			// see note above
+	unsigned char g2_bank;	// TXT_G2_xxx, see above
 } Station;
 
 // Edit/add new station: always edit this file, txtlib.c and station_menu.h
@@ -188,6 +199,9 @@ enum {
 	STATION_TLGZ_HISTORIA,
 	STATION_TLGZ_SPORT,
 	STATION_TLGZ_POLONIA,
+	STATION_ANTENA3,
+	STATION_LASEXTA,
+	STATION_RTP,
 	STATION_TELETEXT64,
 	STATION_ENUM_END	// the number of stations; txtlib.c checks if stations[] has exactly this many entries
 };

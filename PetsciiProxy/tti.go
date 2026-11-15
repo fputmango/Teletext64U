@@ -54,10 +54,7 @@ func chunkytextGetTeletexPage(pageNr string) bool {
 	ps, ns, ct := getPrevNextSubpage(parts[0], nav)
 
 	var output []byte
-	output = append(output, []byte(fmt.Sprintf(
-		"pn=p_\npn=n_\n%v%v%vftl=%v\nftl=%v\nftl=%v\nftl=%v\n<pre>",
-		ps, ns, ct,
-		string(ftl[0]), string(ftl[1]), string(ftl[2]), string(ftl[3])))...)
+	output = fmt.Appendf(output, "pn=p_\npn=n_\n%v%v%vftl=%v\nftl=%v\nftl=%v\nftl=%v\n<pre>", ps, ns, ct, string(ftl[0]), string(ftl[1]), string(ftl[2]), string(ftl[3]))
 
 	for _, row := range rows {
 		output = append(output, row...)
@@ -118,10 +115,7 @@ func ceefaxGetTeletexPage(pageNr string) bool {
 	ps, ns, ct := getPrevNextSubpage(parts[0], nav)
 
 	var output []byte
-	output = append(output, []byte(fmt.Sprintf(
-		"pn=p_\npn=n_\n%v%v%vftl=%v\nftl=%v\nftl=%v\nftl=%v\n<pre>",
-		ps, ns, ct,
-		string(ftl[0]), string(ftl[1]), string(ftl[2]), string(ftl[3])))...)
+	output = fmt.Appendf(output, "pn=p_\npn=n_\n%v%v%vftl=%v\nftl=%v\nftl=%v\nftl=%v\n<pre>", ps, ns, ct, string(ftl[0]), string(ftl[1]), string(ftl[2]), string(ftl[3]))
 
 	for _, r := range rows {
 		output = append(output, r...)
@@ -165,10 +159,7 @@ func teefaxGetTeletexPage(pageNr string) bool {
 	ps, ns, ct := getPrevNextSubpage(parts[0], nav)
 
 	var output []byte
-	output = append(output, []byte(fmt.Sprintf(
-		"pn=p_\npn=n_\n%v%v%vftl=%v\nftl=%v\nftl=%v\nftl=%v\n<pre>",
-		ps, ns, ct,
-		string(ftl[0]), string(ftl[1]), string(ftl[2]), string(ftl[3])))...)
+	output = fmt.Appendf(output, "pn=p_\npn=n_\n%v%v%vftl=%v\nftl=%v\nftl=%v\nftl=%v\n<pre>", ps, ns, ct, string(ftl[0]), string(ftl[1]), string(ftl[2]), string(ftl[3]))
 
 	for _, r := range rows {
 		output = append(output, r...)
@@ -200,10 +191,7 @@ func webfaxGetTeletexPage(pageNr string, station string, dirStation string) bool
 	ps, ns, ct := getPrevNextSubpage(parts[0], nav)
 
 	var output []byte
-	output = append(output, []byte(fmt.Sprintf(
-		"pn=p_\npn=n_\n%v%v%vftl=%v\nftl=%v\nftl=%v\nftl=%v\n<pre>",
-		ps, ns, ct,
-		string(ftl[0]), string(ftl[1]), string(ftl[2]), string(ftl[3])))...)
+	output = fmt.Appendf(output, "pn=p_\npn=n_\n%v%v%vftl=%v\nftl=%v\nftl=%v\nftl=%v\n<pre>", ps, ns, ct, string(ftl[0]), string(ftl[1]), string(ftl[2]), string(ftl[3]))
 
 	for _, r := range rows {
 		output = append(output, r...)
@@ -235,10 +223,7 @@ func sparkGetTeletexPage(pageNr string) bool {
 	ps, ns, ct := getPrevNextSubpage(parts[0], nav)
 
 	var output []byte
-	output = append(output, []byte(fmt.Sprintf(
-		"pn=p_\npn=n_\n%v%v%vftl=%v\nftl=%v\nftl=%v\nftl=%v\n<pre>",
-		ps, ns, ct,
-		string(ftl[0]), string(ftl[1]), string(ftl[2]), string(ftl[3])))...)
+	output = fmt.Appendf(output, "pn=p_\npn=n_\n%v%v%vftl=%v\nftl=%v\nftl=%v\nftl=%v\n<pre>", ps, ns, ct, string(ftl[0]), string(ftl[1]), string(ftl[2]), string(ftl[3]))
 
 	for _, r := range rows {
 		output = append(output, r...)
@@ -270,9 +255,7 @@ func hbntekstiGetTeletexPage(pageNr string) bool {
 	ps, ns, ct := getPrevNextSubpage(parts[0], nav)
 
 	var output []byte
-	output = append(output, []byte(fmt.Sprintf(
-		"pn=p_\npn=n_\n%v%v%v<pre>",
-		ps, ns, ct))...)
+	output = fmt.Appendf(output, "pn=p_\npn=n_\n%v%v%v<pre>", ps, ns, ct)
 
 	// Re-create header
 	copy(rows[0][1:], fmt.Sprintf("      \x07%s HBN TEKSTI-TV%s", parts[0], getHBNDate()))
@@ -307,9 +290,7 @@ func bmn1GetTeletexPage(pageNr string) bool {
 	ps, ns, ct := getPrevNextSubpage(parts[0], nav)
 
 	var output []byte
-	output = append(output, []byte(fmt.Sprintf(
-		"pn=p_\npn=n_\n%v%v%v<pre>",
-		ps, ns, ct))...)
+	output = fmt.Appendf(output, "pn=p_\npn=n_\n%v%v%v<pre>", ps, ns, ct)
 
 	// Re-create header
 	copy(rows[0][1:], fmt.Sprintf("         \x07%s\x02BMN1%s", parts[0], getBMNDate()))
@@ -358,9 +339,7 @@ func teletext64GetTeletexPage(pageNr string) bool {
 	ps, ns, ct := getPrevNextSubpage(parts[0], nav)
 
 	var output []byte
-	output = append(output, []byte(fmt.Sprintf(
-		"pn=p_\npn=n_\n%v%v%vftl=100\nftl=199\nftl=200\nftl=300\n<pre>",
-		ps, ns, ct))...)
+	output = fmt.Appendf(output, "pn=p_\npn=n_\n%v%v%vftl=100\nftl=199\nftl=200\nftl=300\n<pre>", ps, ns, ct)
 
 	// Re-create header
 	copy(rows[0][1:], fmt.Sprintf("         \x02TXT64  %s", getTTXDate()))
@@ -397,9 +376,6 @@ func teletext64GetTeletexPage(pageNr string) bool {
 	savePage(DirTELETEXT64, pageNr, output)
 	return true
 }
-
-var subpage byte
-var fullDoubleHeightRow bool
 
 func parseTTIRows(r io.Reader, pageStr string, subpageStr string, isCEEFAX bool) ([][]byte, NavignationInfo) {
 	subpageFound := false

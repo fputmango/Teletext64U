@@ -117,13 +117,37 @@ const char * const font_filenames[4][2] = {
 	{ "teletext-mosaic.bin",					"teletext-mosaic.bin" },
 };
 
+// New feature introduced in R2.10.0
+// G2 banks: station specific G2 fonts that replace the default G2 while a station that uses them is selected
+// The bank of a station is Station.g2_bank (see TXT_G2_xxx in txtlib.h)
+// 0 is the default G2 (font_filenames above, used in releases up to 2.9.0)
+// Bank n (for n > 0) has its filenames in g2_bank_files[n-1]. Stations that share a language in the nation subset can have their own bank
+// To add a bank:
+// - add a TXT_G2_xxx in txtlib.h, and it's filenames below
+// - set it in stations[]
+// - map it's bytes in map_extended_ascii_to_txt_charset()
+static const char * const g2_bank_files[][2] = {
+	{ "teletext-bold-sp-g2.bin", "teletext-thin-sp-g2.bin" },	// TXT_G2_SPANISH
+	{ "teletext-bold-pt-g2.bin", "teletext-thin-pt-g2.bin" },	// TXT_G2_PORTUGUESE
+};
+static unsigned char g2_bank_req = 0;			// the bank font_filename() returns the G2 filename of
+static unsigned char g2_bank_loaded = 0;	// the bank that is now in memory at FONT_G2_ADDR
+
+// server filename of a font file. Used by fetch_font_file()
+static const char *font_filename(FontFileKind kind, bool thin) {
+	if (kind == FONT_FILE_G2 && g2_bank_req > 0) return g2_bank_files[g2_bank_req - 1][thin ? 1 : 0];
+	return font_filenames[kind][thin ? 1 : 0];
+}
+
 // Implemented per build
 extern bool fetch_font_file(FontFileKind kind, bool thin, unsigned char *dest, unsigned int len);
+
+static bool fetch_g2_bank(bool thin);	// defined below, because it needs station_index
 
 // These need to be loaded when swapping fonts
 bool load_font_set(bool thin) {
 	if (!fetch_font_file(FONT_FILE_TEXT, thin, FONT_TEXT_BOLD, FONT_SIZE_1K)) return false;
-	if (!fetch_font_file(FONT_FILE_G2, thin, FONT_G2_BOLD_BASE, FONT_SIZE_G2)) return false;
+	if (!fetch_g2_bank(thin)) return false;
 	if (!fetch_font_file(FONT_FILE_LANG, thin, FONT_LANG_TABLE, FONT_SIZE_LANG)) return false;
 	return true;
 }
@@ -211,6 +235,31 @@ static unsigned long cycle_jiffies = 0;
 static unsigned long stopwatch_jiffies = 0;
 
 static unsigned char station_index = 0;
+
+// Fetches the G2 font of the current station's bank into FONT_G2_ADDR. If the bank file can't be fetched (for example the server doesn't have it yet)
+// the default G2 is fetched instead: the program keeps working, only the characters of the bank are wrong.
+static bool fetch_g2_bank(bool thin) {
+	unsigned char want = stations[station_index].g2_bank;
+
+	g2_bank_req = want;
+	if (fetch_font_file(FONT_FILE_G2, thin, FONT_G2_BOLD_BASE, FONT_SIZE_G2)) {
+		g2_bank_loaded = want;
+		return true;
+	}
+	if (want == 0) return false;
+	g2_bank_req = 0;
+	if (!fetch_font_file(FONT_FILE_G2, thin, FONT_G2_BOLD_BASE, FONT_SIZE_G2)) return false;
+	g2_bank_loaded = 0;
+	return true;
+}
+
+// Call after the station has changed. Fetches the G2 bank of the new station, but only if it differs from the bank in memory.
+// font_ptr[] does not change: every bank occupies the same G2 memory.
+static void ensure_g2_bank(void) {
+	if (stations[station_index].g2_bank != g2_bank_loaded) {
+		fetch_g2_bank(font_is_thin);
+	}
+}
 
 // Not static: referenced as external symbols from toggle_conceal.s and toggle_flash.s
 unsigned char is_conceal = true;
@@ -900,6 +949,49 @@ void show_wait_bar(unsigned char seconds) {
 // Maps extended ASCII characters to teletext character set 0x00..0x1F
 // see https://www.ascii-code.com/ for the extended ASCII codes (128-255)
 void map_extended_ascii_to_txt_charset(int *p, unsigned char i) {
+	// G2 banks: the characters of the station's own G2 bank take priority over the cases below, which assume default G2
+	// The euro sign (0x80) is not listed: the banks have it in the same slot (0x0E) as default G2
+	if (stations[i].g2_bank == TXT_G2_SPANISH) {
+		switch (*p) {
+			case 0xC1: *p = 0x00; return; // Á
+			case 0xC9: *p = 0x01; return; // É
+			case 0xCD: *p = 0x02; return; // Í
+			case 0xD3: *p = 0x03; return; // Ó
+			case 0xDA: *p = 0x04; return; // Ú
+			case 0xD1: *p = 0x05; return; // Ñ
+			case 0xC7: *p = 0x06; return; // Ç
+			case 0xDC: *p = 0x07; return; // Ü
+			case 0xA4: *p = 0x10; return; // @ (the server sends 0xA4, because 0x40 is ¡ in the Spanish national option subset)
+			case 0xBA: *p = 0x14; return; // º
+			case 0xAA: *p = 0x15; return; // ª
+			case 0xB0: *p = 0x16; return; // °
+		}
+	} else if (stations[i].g2_bank == TXT_G2_PORTUGUESE) {
+		switch (*p) {
+			case 0xC1: *p = 0x00; return; // Á
+			case 0xC9: *p = 0x01; return; // É
+			case 0xCD: *p = 0x02; return; // Í
+			case 0xD3: *p = 0x03; return; // Ó
+			case 0xDA: *p = 0x04; return; // Ú
+			case 0xC3: *p = 0x05; return; // Ã
+			case 0xC7: *p = 0x06; return; // Ç
+			case 0xD5: *p = 0x07; return; // Õ
+			case 0xC0: *p = 0x08; return; // À
+			case 0xC2: *p = 0x0B; return; // Â
+			case 0xCA: *p = 0x0C; return; // Ê
+			case 0xD4: *p = 0x0D; return; // Ô
+			case 0xE3: *p = 0x0F; return; // ã
+			case 0xA4: *p = 0x10; return; // @ (the server sends 0xA4, because 0x40 is ¡ in the national option subset)
+			case 0xF5: *p = 0x11; return; // õ
+			case 0xBA: *p = 0x14; return; // º
+			case 0xAA: *p = 0x15; return; // ª
+			case 0xB0: *p = 0x16; return; // °
+			case 0xE2: *p = 0x17; return; // â
+			case 0xEA: *p = 0x18; return; // ê
+			case 0xF4: *p = 0x19; return; // ô
+		}
+	}
+
 	switch (*p) {
 		case 0x80: *p = 0x0E; break; // €
 		case 0xE7: *p = 0x08; break; // ç
@@ -2114,6 +2206,7 @@ void teletext_main_loop(int startPageNumber) {
 #else
 					clear_bitmap_screen();
 #endif
+					ensure_g2_bank();
 					get_teletext_page(currentPageNumber, currentSubpageNumber);
 					break;
 				case KEY_M:
@@ -2131,6 +2224,7 @@ void teletext_main_loop(int startPageNumber) {
 #else
 					clear_bitmap_screen();
 #endif
+					ensure_g2_bank();
 					get_teletext_page(currentPageNumber, currentSubpageNumber);
 					break;
 				case KEY_T:
@@ -2174,6 +2268,7 @@ void teletext_main_loop(int startPageNumber) {
 #else
 					clear_bitmap_screen();
 #endif
+					ensure_g2_bank();
 					get_teletext_page(currentPageNumber, currentSubpageNumber);
 					break;
 			}

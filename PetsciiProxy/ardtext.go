@@ -114,9 +114,7 @@ func ardtextGetTeletexPage(pageNr string) bool {
 	// Note: to support prev/next subpage numbers; the full site must be parsed: e.g. https://www.ard-text.de/index.php?page=403
 	// and detect something like this: <div id="output_unterseite" class="subpageCounter">1/3</div>
 	var output []byte
-	output = append(output, []byte(fmt.Sprintf(
-		"%v%v%vftl=100\nftl=200\nftl=171\nftl=710\n<pre>",
-		ps, ns, ct))...)
+	output = fmt.Appendf(output, "%v%v%vftl=100\nftl=200\nftl=171\nftl=710\n<pre>", ps, ns, ct)
 
 	row0 := make([]byte, 40)
 	for i := range row0 {

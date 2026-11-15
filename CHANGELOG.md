@@ -1,5 +1,20 @@
 # **Teletext64U** changelog
 
+## [2.10.0] - 2026-11-15
+
+### Added 
+- New stations: Antena 3 & laSexta (Spain, both from Atresmedia)
+- New station: RTP Teletexto (Portugal)
+- New (technical) feature: language specific G2 character sets. A station can support its own set of extra national characters, loaded from the server when switched to a station of that language. Applied for the new Spanish  (Á É Í Ó Ú Ñ Ç Ü º ª °) and Portugese (Á É Í Ó Ú Ã Ç Õ À Â Ê Ô ã õ º ª °â ê ô) stations. These are stored in teletext-bold-XX-g2.bin/teletext-thin-XX-g2.bin files. With XX=sp for Spanish and XX=pt for Portugese.
+
+### Fixed
+- DR Tekst-TV: post-fix page 200 offset afjusted.
+
+### Notes about the added Teletext services
+- All of the added services use the same FAB Teletext system. The FAB system (https://www.fab-online.com/teletext/) is also used by Telegazeta. They all have the same PNG image size, same font and some navigation html. So it took not too much effort to add support for these services.
+
+
+
 ## [2.9.0] - 2026-11-12
 
 ### Added 

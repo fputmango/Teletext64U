@@ -108,11 +108,8 @@ func tekstiGetTeletexPage(pageNr string) bool {
 		ps, ns, _ = getPrevNextSubpage(parts[0], nav)
 	}
 
-	// to do: add the fastext link text labels on row 24
 	var output []byte
-	output = append(output, []byte(fmt.Sprintf(
-		"%v%vftl=%v\nftl=%v\nftl=%v\nftl=%v\n<pre>", ps, ns,
-		"100", "200", "300", "400"))...)
+	output = fmt.Appendf(output, "%v%vftl=%v\nftl=%v\nftl=%v\nftl=%v\n<pre>", ps, ns, "100", "200", "300", "400")
 
 	headerRow := bytes.Repeat([]byte{0x20}, 40)
 	now := time.Now()

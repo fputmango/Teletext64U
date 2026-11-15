@@ -62,8 +62,7 @@ func drteksttvGetTeletexPage(pageNr string) bool {
 	// Nyheder (110), Sport (200), TV (300) and Vejret (400)
 	// aka: nieuws, sport, TV, weather
 	var output []byte
-	output = append(output, []byte(fmt.Sprintf(
-		"%v%v%v%vftl=110\nftl=200\nftl=300\nftl=400\n<pre>", pp, np, ps, ns))...)
+	output = fmt.Appendf(output, "%v%v%v%vftl=110\nftl=200\nftl=300\nftl=400\n<pre>", pp, np, ps, ns)
 
 	for _, r := range rows {
 		output = append(output, r...)
@@ -134,15 +133,14 @@ func parseDRRows(body io.ReadCloser, pageNr string, subPageNr string) ([][]byte,
 				}
 				if hrefVal != "" {
 					segments := strings.Split(strings.Trim(hrefVal, "/"), "/")
-					if currentMapName == "FPMap1" {
-						// FPMap1 handles subpages (e.g., "/cgi-bin/fttx1.exe/601/3")
+					switch currentMapName {
+					case "FPMap1": // handles subpages (e.g., "/cgi-bin/fttx1.exe/601/3")
 						if len(segments) >= 4 {
 							if subIdx, err := strconv.Atoi(segments[3]); err == nil {
 								subPages = append(subPages, subIdx)
 							}
 						}
-					} else if currentMapName == "FPMap0" {
-						// FPMap0 handles main pages (e.g., "/cgi-bin/fttx1.exe/600")
+					case "FPMap0": // handles main pages (e.g., "/cgi-bin/fttx1.exe/600")
 						if len(segments) >= 3 {
 							if targetPage, err := strconv.Atoi(segments[2]); err == nil {
 								if targetPage < currentPageInt {
@@ -656,14 +654,14 @@ func parseDRRows(body io.ReadCloser, pageNr string, subPageNr string) ([][]byte,
 			for i := 0; i < len(runes)-1; i++ {
 				if !unicode.IsSpace(runes[i]) && unicode.IsSpace(runes[i+1]) {
 					count++
-					if count == 1 {
+					switch count {
+					case 1:
 						posCyan = i + 1
-					} else if count == 2 {
+					case 2:
 						posWhite = i + 1
-					} else {
+					default:
 						break
 					}
-
 				}
 			}
 		}
@@ -731,16 +729,18 @@ func parseDRRows(body io.ReadCloser, pageNr string, subPageNr string) ([][]byte,
 
 	if pageNum == 200 {
 		// draw top header half height line in 3 colors
+		posCyan := 5
+		posWhite := 19
 		pageBuffer[1][0] = TCC_MOSAIC_RED
 		pageBuffer[1][1] = 0x70
 		pageBuffer[1][2] = TCC_HOLD_MOSAICS
-		for i := 3; i < 6; i++ {
+		for i := 3; i < posCyan; i++ {
 			pageBuffer[1][i] = TCC_MOSAIC_RED
 		}
-		for i := 6; i < 20; i++ {
+		for i := posCyan; i < posWhite; i++ {
 			pageBuffer[1][i] = TCC_MOSAIC_CYAN
 		}
-		for i := 20; i < 40; i++ {
+		for i := posWhite; i < 40; i++ {
 			pageBuffer[1][i] = TCC_MOSAIC_WHITE
 		}
 
@@ -751,13 +751,13 @@ func parseDRRows(body io.ReadCloser, pageNr string, subPageNr string) ([][]byte,
 		pageBuffer[3][0] = TCC_MOSAIC_RED
 		pageBuffer[3][1] = 0x23
 		pageBuffer[3][2] = TCC_HOLD_MOSAICS
-		for i := 3; i < 6; i++ {
+		for i := 3; i < posCyan; i++ {
 			pageBuffer[3][i] = TCC_MOSAIC_RED
 		}
-		for i := 6; i < 20; i++ {
+		for i := posCyan; i < posWhite; i++ {
 			pageBuffer[3][i] = TCC_MOSAIC_CYAN
 		}
-		for i := 20; i < 40; i++ {
+		for i := posWhite; i < 40; i++ {
 			pageBuffer[3][i] = TCC_MOSAIC_WHITE
 		}
 		pageBuffer[4][0] = TCC_ALPHA_CYAN

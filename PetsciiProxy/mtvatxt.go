@@ -24,11 +24,10 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 )
 
-const mtvaTxtRows = 25
+// const mtvaTxtRows = 25
 
 // Windows-1250/ISO-8859-2 mapping for each accented Hungarian letter; it's used by mtvatxt_glyphs.go
 var mtvaTxtAccentStrip = map[byte]byte{
@@ -158,6 +157,8 @@ func fetchMtvaTxtPage(url string) ([]byte, int, bool) {
 	return body, resp.StatusCode, true
 }
 
+/*
+
 const mtvaTxtHTMLRetryAfter = time.Hour
 
 var (
@@ -179,7 +180,7 @@ func mtvaTxtBlockHTML() {
 	}
 	mtvaTxtHTMLBlockedAt = time.Now()
 }
-
+*/
 /*
 func parseMtvaTxtRows(body []byte, page string) [][]byte {
 	pageBuffer := newPageBuffer(mtvaTxtRows)
@@ -549,10 +550,11 @@ func mtvaTxtHeaderRow(page string) []byte {
 	for i := range row {
 		row[i] = 0x20
 	}
-	row[0] = TCC_ALPHA_CYAN
-	copy(row[10:], []byte("MTVA TXT"))
-	row[19] = TCC_ALPHA_YELLOW
-	copy(row[20:], []byte(time.Now().Format("2006.01.02.  15:04")))
+	// this header will resemble how MTVA is displayed on a TV
+	copy(row[8:], fmt.Appendf(nil, "\x03%s\x02MTVA", page))
+	row[21] = TCC_ALPHA_WHITE
+	copy(row[22:], []byte(time.Now().Format("2006.01.02.  15:04")))
+	row[34] = TCC_ALPHA_YELLOW
 	return row
 }
 

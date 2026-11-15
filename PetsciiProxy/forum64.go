@@ -451,7 +451,7 @@ func renderForum64IndexPage(cat *forum64Category, sub int) []byte {
 			copy(row[hCol:], []byte(line))
 			if j == len(lines)-1 {
 				row[pColorCol] = pPrefix
-				copy(row[pCol:], []byte(fmt.Sprintf("%3d", t.pageNr)))
+				copy(row[pCol:], fmt.Appendf(nil, "%3d", t.pageNr))
 			}
 			block = append(block, row)
 		}

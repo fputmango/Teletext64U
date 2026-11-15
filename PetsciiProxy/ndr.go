@@ -74,8 +74,7 @@ func ndrtextGetTeletexPage(pageNr string) bool {
 	pp, np := buildPageNavDirectives(nav.prevPage, nav.nextPage)
 
 	var output []byte
-	output = append(output, []byte(fmt.Sprintf(
-		"%v%v%v%v%vftl=101\nftl=200\nftl=300\nftl=650\n<pre>", pp, np, ps, ns, ct))...)
+	output = fmt.Appendf(output, "%v%v%v%v%vftl=101\nftl=200\nftl=300\nftl=650\n<pre>", pp, np, ps, ns, ct)
 
 	row0 := newPageBuffer(1)[0]
 	copy(row0[21:], stringToLatin1Bytes(getNDRDate()))

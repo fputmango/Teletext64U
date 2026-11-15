@@ -144,7 +144,7 @@ static void build_font_url(char *url, FontFileKind kind, bool thin) {
 #else
 	strcpy(url, "http://" PETSCIIPROXY "/fonts/");
 #endif
-	strcat(url, font_filenames[kind][thin ? 1 : 0]);
+	strcat(url, font_filename(kind, thin));
 }
 
 bool fetch_font_file(FontFileKind kind, bool thin, unsigned char *dest, unsigned int len) {

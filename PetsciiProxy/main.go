@@ -50,6 +50,8 @@ Supported teletext services:
 - RSI LA 1, RSI LA 2 (Switzerland, Italian)
 - MTVA Text (Hungary, Hungarian)
 - Telegazeta TVP 1, 2, 3, Kultura, Historia, Sport, Polonia (Poland, Polish)
+- Antena 3, La Sexta (Spain, Spanish)
+- RTP Teletexto (Portugal, Portugese)
 
 The NOS-TT file format is being used for the other teletext services:
 Is set up fairly efficient: mostly around 1073 bytes; or bigger if a page has subpages or page links.
@@ -109,7 +111,7 @@ var embeddedFontsFS embed.FS
 var embeddedDriversFS embed.FS
 
 // Version
-const pp_version = "2.9.0"
+const pp_version = "2.10.0"
 
 // Supported teletext services
 const (
@@ -153,13 +155,16 @@ const (
 	DirTELETEXT64       = "TELETEXT64" // Teletext 64 Ultimate's own Users's Guide as a Teletext service
 	DirTELETEXT64TTI    = "teletext64" // Host folder of the TTI files; deliberate lower case folder name - see teletext64GetTeletexPage in tti.go
 	DirTELETEKSTARCHIEF = "TELETEKSTARCHIEF"
-	DirTLGZ_TVP1        = "TLGZ-TG1" // Polish teletext (Telegazeta)
+	DirTLGZ_TVP1        = "TLGZ-TG1" // TLGZ=Telegazeta
 	DirTLGZ_TVP2        = "TLGZ-TG2"
 	DirTLGZ_TVP3        = "TLGZ-OTV"
 	DirTLGZ_Kultura     = "TLGZ-KUL"
 	DirTLGZ_Historia    = "TLGZ-HIS"
 	DirTLGZ_Sport       = "TLGZ-SPO"
 	DirTLGZ_Polonia     = "TLGZ-SAT"
+	DirAntena3          = "ANTENA3"
+	DirLaSexta          = "LASEXTA"
+	DirRTP              = "RTP"
 )
 
 const StationDownloads = "DOWNLOADS"
@@ -211,6 +216,9 @@ var handlers = map[string]http.HandlerFunc{
 	DirTLGZ_Historia:    makeHandler(DirTLGZ_Historia, func(p string) bool { return tlgzGetTeletexPage(p, DirTLGZ_Historia) }),
 	DirTLGZ_Sport:       makeHandler(DirTLGZ_Sport, func(p string) bool { return tlgzGetTeletexPage(p, DirTLGZ_Sport) }),
 	DirTLGZ_Polonia:     makeHandler(DirTLGZ_Polonia, func(p string) bool { return tlgzGetTeletexPage(p, DirTLGZ_Polonia) }),
+	DirAntena3:          makeHandler(DirAntena3, func(p string) bool { return atrGetTeletexPage(p, DirAntena3) }),
+	DirLaSexta:          makeHandler(DirLaSexta, func(p string) bool { return atrGetTeletexPage(p, DirLaSexta) }),
+	DirRTP:              makeHandler(DirRTP, func(p string) bool { return rtpGetTeletexPage(p, DirRTP) }),
 }
 
 // Teletext control codes (range 0x00..0x1F); Alpha is a regular character; a mosaic is a graphics character
@@ -614,6 +622,7 @@ func modTime(path string) time.Time {
 	return info.ModTime() // aka file age
 }
 
+// unused parameters path and dirStation; leave the for future rai.go
 var bypassFreshnessCheck = func(path string) bool { return false }
 var bypassOfflineBackoff = func(dirStation string) bool { return false }
 

@@ -38,6 +38,10 @@ Teletext 64 Ultimate has its own dedicated server at petsciiproxy.nl, so you don
 |Teletekstarchief |The Netherlands |
 |NDR TEXT |Germany |
 |Telegazeta TVP 1, 2, 3, Kultura, Historia, Sport and Polonia |Poland |
+|Antena 3 & laSexta |Spain |
+|RTP Teletexto |Portugal |
+
+**Screenshots of every service can be found here: [overview](SERVICES.md)**
  
 My mission: add as many Teletext services as possible. So let me know if you have any wishes.
 
@@ -64,6 +68,7 @@ Although the C64U has excellent networking capabilities, it unfortunately is res
 - User's Guide as a full Teletext service!
 - Mouse support - click page numbers and fastext links, use the tiny mouse menu for more navigation options. And a Amiga Workbench 1.3 style mouse pointer.
 - Print a Teletext page - Only Commodore MPS printers are supported.
+- National subset characters (ETS 300 706, table 36) and additional G2 national characters per language (from release 2.10 and above).
 
 ## Tools used for this project
 - Xcode, CC65 (C/asm Teletext64U), Visual Studio Code (Go language PetsciiProxy server), CharPad (character sets), spritemate.com (for drawing the mouse pointer) 
