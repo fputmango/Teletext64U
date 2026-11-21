@@ -9,7 +9,7 @@ Some software that can process TTI:
 |---|---|---|
 | MiniTED / TED Scheduler | Original MRG broadcast software | https://zxnet.co.uk/teletext/documents/ttiformat.pdf |
 | VBIT2 | Peter Kwan's teletext inserter (Raspberry Pi) | https://github.com/peterkvt80/vbit2 |
-| wxTED | Page editor | – |
+| wxTED | Page editor | https://github.com/peterkvt80/wxted |
 | QTeletextMaker | Level 2.5 page editor | https://github.com/gkthemac/QTeletextMaker |
 | ttxweb | Fabian Schneider's Teletext to HTML generator | https://github.com/fabianswebworld/ttxweb |
 | hacktv | Analogue TV transmitter (HackRF), sends TTI | https://manpages.ubuntu.com/manpages/noble/man1/hacktv.1.html |
@@ -153,4 +153,4 @@ To prevent misuse or Teletext broadcasters ban the server, a rate limit is appli
 
 ## Services that are already TTI
 For services whose source is already TTI*, /T returns a normalised Level 1 version with it's own header, PS bits, ESC coding.
-*)currently CEEFAX, TEEFAX, ChunkyText, Webfax 1 & 2, Spark, HBN Tekksti-TV, BMN1 Bollentekst, CRYPTEXT
+*)currently CEEFAX, TEEFAX, ChunkyText, Webfax 1 & 2, Spark, HBN Teksti-TV, BMN1 Bollentekst, CRYPTEXT
