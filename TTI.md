@@ -147,3 +147,10 @@ OL,23,
 OL,24,binnenland   sport  verkeer   weer
 FL,102,601,730,702,0,100
 </pre>
+
+## Misuse prevention
+To prevent misuse or Teletext broadcasters ban the server, a rate limit is applied: a request can make up to 50 fetches at the broadcaster, so each client may make 10 /T requests in a row and after that one per 2 seconds. Faster requests get a "429 Too Many Requests" with a Retry-After header (seconds), before anything is fetched.
+
+## Services that are already TTI
+For services whose source is already TTI*, /T returns a normalised Level 1 version with it's own header, PS bits, ESC coding.
+*)currently CEEFAX, TEEFAX, ChunkyText, Webfax 1 & 2, Spark, HBN Tekksti-TV, BMN1 Bollentekst, CRYPTEXT
